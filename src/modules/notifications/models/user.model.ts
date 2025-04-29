@@ -20,7 +20,6 @@ import {
     declare userPassword: string;
     declare userEmail: string;
     declare userPersonalFile: string;
-    declare userDisabledReason?: string;
     declare createdDate: Date;
     declare updatedDate: Date;
     declare deletedDate?: Date | null;
@@ -84,11 +83,6 @@ import {
       field: "user_personal_file",
       type: DataTypes.STRING,
       allowNull: false
-    },
-    userDisabledReason: {
-      field: "user_disabled_reason",
-      type: DataTypes.STRING,
-      allowNull: true
     },
     createdDate: {
       field: "created_date",

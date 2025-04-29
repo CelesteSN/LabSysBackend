@@ -8,9 +8,9 @@ import { userRouter } from './modules/users/routes/user.route';
 import authRoutes from "./modules/security/routes/auth.route";
 import 'express-async-errors'; // MUY IMPORTANTE para capturar errores async
 import { errorHandler } from './middlewares/errorHandler';
-
-
-
+import { notificationRouter } from './modules/notifications/routes/notification.route';
+import dotenv from 'dotenv';
+dotenv.config();
 
 
 const app = express();
@@ -21,6 +21,8 @@ app.use(bodyParser.json({ limit: "5mb" }));
 
 app.use('/api/v1/auth', authRoutes);
 app.use("/api/v1/users", userRouter); 
+app.use('/api/v1/notifications', notificationRouter);
+
 //app.use("/api/laboratories", laboratoryRouter);
 
 

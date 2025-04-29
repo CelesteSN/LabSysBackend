@@ -19,8 +19,13 @@ export const authenticateToken = (
   }
 
   try {
-    const decoded = jwt.verify(token, appConfig.JWT_SECRET);
-    req.user = decoded;
+    
+    const decoded = jwt.verify(token, appConfig.JWT_SECRET) as { userId: string };
+
+req.user = {
+  userLoguedId: decoded.userId
+};
+
     next();
   } catch (err) {
     return res.status(403).json({ message: 'Token inválido' });

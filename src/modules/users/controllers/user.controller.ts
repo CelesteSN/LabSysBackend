@@ -1,20 +1,21 @@
-import { listUsers, addUser, getUser, modifyUser, lowUser} from "../services/user.service";
+import { listUsers, addUser, getUser, modifyUser, lowUser, addAnswer} from "../services/user.service";
 import { Request, Response } from "express";
 import {AllUsersDto} from "../dtos/allUsers.dto"
 import { catchAsync } from '../../../utils/catchAsync';
 import { UserFilter } from "../dtos/userFilters.dto";
+import { boolean } from "joi";
 
 
 
 export const  getAllUsers = catchAsync(async(req: Request, res: Response)=> {
-  const { userId } = (req as any).user;
+  const { userLoguedId } = (req as any).user;
   const filters: UserFilter = {
     search: req.query.search as string,
     fromDate: req.query.fromDate ? new Date(req.query.fromDate as string) : undefined,
     toDate: req.query.toDate ? new Date(req.query.toDate as string) : undefined
 };
   
-    const users: AllUsersDto[] = await listUsers(userId, filters);
+    const users: AllUsersDto[] = await listUsers(userLoguedId, filters);
     res.status(200).json({
       success: true,
       data: users
@@ -28,7 +29,7 @@ export const createUser = catchAsync(async(req: Request, res: Response) => {
        // res.status(201).json(newUser);
         res.status(201).json({
           success: true,
-          messaje: "El usuario ha sido creado exitosamente. Recuerde que para acceder a la plataforma, su solicitud deberá ser aprobada por el administrador."
+          messaje: "El usuario ha sido creado exitosamente. Recuerde que para acceder a la plataforma, su solicitud deberá ser aprobada. Se le notificará por correo electrónico cuando su solicitud sea aprobada o rechazada."
       });
     })
 
@@ -42,9 +43,25 @@ export const getUserById = catchAsync(async(req: Request, res: Response)=> {
     });
 })
 
+export const answerUser = catchAsync(async(req:Request, res: Response)=>{
+
+  const { userLoguedId } = (req as any).user;
+
+  const userId = req.params.id;
+  const isAccept = String(req.query.isAccept);
+  const comment = req.body;
+  await addAnswer(userLoguedId, userId, isAccept, comment);
+  res.status(201).json({
+    success: true,
+    messaje: "Solicitud respondida exitosamente"
+})
+})
+
 
 export async function updateUser(req: Request, res: Response): Promise<void> {
-    const userId = req.params.id; // Asegúrate de que el ID del usuario se pase como un parámetro en la URL
+  const { token } = (req as any).user;
+    const userId = req.params.id;
+    const isAccept = boolean // Asegúrate de que el ID del usuario se pase como un parámetro en la URL
     const firstName = req.body.firstName;
       const lastName = req.body.lastName;
       const password = req.body.password;

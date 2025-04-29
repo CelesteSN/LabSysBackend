@@ -10,7 +10,7 @@ import { mapUserToDto } from "../dtos/allUsers.dto";
 import { AllUsersDto } from "../dtos/allUsers.dto";
 import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError } from '../../../errors/customUserErrors';
 import { UserFilter } from "../dtos/userFilters.dto";
-import { Op } from 'sequelize';
+import { Op, where } from 'sequelize';
 import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
 
 
@@ -186,6 +186,51 @@ export async function getUser(id: string): Promise<OneUserDto> {
     return mapOneUserToDto(user);
 }
 
+export async function addAnswer(userLoguedId: string, userId: string, isAccept: string, comment: string) {
+    //Obtengo el usuario logueado
+    const loguedUser = await User.findByPk(userLoguedId);
+    if (!loguedUser) {
+        throw new UserNotFoundError();
+    }
+
+    //Obtengo el usuario al que le quiero responder la solicitud de alta
+    const userPending = await User.findByPk(userId);
+    if (!userPending) {
+        throw new UserNotFoundError();
+    }
+
+    //Lo acepto en la plataforma
+    if (isAccept == "true") {
+        const activeStatus = await UserStatus.findOne({
+            where: {
+                'userStatusName': UserStatusEnum.ACTIVE
+            }
+        }
+
+        )
+        userPending.setUserStatus(activeStatus?.userStatusId)
+        userPending.updatedDate = new Date()
+        userPending.save();
+
+    }
+    else {
+        //No lo acepto en la plataforma
+       // if (isAccept == "false") {
+            const rejectedStatus = await UserStatus.findOne({
+                where: {
+                    'userStatusName': UserStatusEnum.REJECTED
+                }
+            }
+
+            )
+            userPending.setUserStatus(rejectedStatus?.userStatusId);
+            userPending.updatedDate = new Date();
+            userPending.userDisabledReason = comment;
+            userPending.save();
+        }
+
+    }
+//}
 
 export async function modifyUser(id: string, firstName: string, lastName: string, password: string, email: string, roleId: string): Promise<User | null> {
 
