@@ -1,0 +1,221 @@
+//import { add } from "winston";
+import { User } from "../models/user.model";
+import bcrypt from "bcrypt";
+import { UserStatus } from "../models/userStatus.model";
+import { UserStatusEnum } from "../enums/userStatus.enum"
+import { RoleEnum } from "../enums/role.enum";
+import { Role } from "../models/role.model";
+import { randomUUID } from "crypto";
+import { mapUserToDto } from "../dtos/allUsers.dto";
+import { AllUsersDto } from "../dtos/allUsers.dto";
+import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError } from '../../../errors/customUserErrors';
+import { UserFilter } from "../dtos/userFilters.dto";
+import { Op } from 'sequelize';
+import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
+
+
+
+export async function listUsers(userId: string, filters?: UserFilter): Promise<AllUsersDto[]> {
+
+    //Obtengo el usuario logueado
+    const loguedUser = await User.findByPk(userId);
+    if (!loguedUser) {
+        throw new UserNotFoundError();
+    }
+
+
+    // Construimos condiciones dinámicas
+    const whereConditions: any = {};
+
+    if (filters?.search) {
+        whereConditions[Op.or] = [
+            { userFirstName: { [Op.iLike]: `%${filters.search}%` } },
+            { userLastName: { [Op.iLike]: `%${filters.search}%` } }
+        ];
+    }
+
+    if (filters?.fromDate) {
+        whereConditions.createdDate = { ...whereConditions.createdDate, [Op.gte]: filters.fromDate };
+    }
+
+    if (filters?.toDate) {
+        whereConditions.createdDate = { ...whereConditions.createdDate, [Op.lte]: filters.toDate };
+    }
+
+    //Obtengo el rol del usuario logueado para verificar que tipo de listado debe visualizar
+    const roleUser = await loguedUser.getRole();
+    if (roleUser?.roleName == RoleEnum.ADMIN) {
+        //throw new Error('No autorizado para listar usuarios'); // O podés lanzar un ForbiddenError
+
+        const users = await User.findAll({
+            where: whereConditions,
+            attributes: [
+                'userId',
+                'userFirstName',
+                'userLastName',
+                'createdDate'
+            ],
+            include: [
+                {
+                    model: UserStatus,
+                    attributes: ['userStatusName'],
+                    where: {
+                        userStatusName: UserStatusEnum.PENDING
+                        // Solo usuarios en estado Pending
+                    }
+                },
+                {
+                    model: Role,
+                    attributes: ['roleName'],
+                    where: {
+                        roleName: RoleEnum.TUTOR
+                        // Solo usuarios cuyo rol es Responsable
+                    }
+                }
+            ]
+        });
+
+        return users.map(mapUserToDto);
+    }
+    else {
+        if (roleUser?.roleName == RoleEnum.TUTOR) {
+            const users = await User.findAll({
+                where: whereConditions,
+                attributes: [
+                    'userId',
+                    'userFirstName',
+                    'userLastName',
+                    'createdDate'
+                ],
+                include: [
+                    {
+                        model: UserStatus,
+                        attributes: ['userStatusName'],
+                        where: {
+                            userStatusName: UserStatusEnum.PENDING
+                            // Solo usuarios en estado Pending
+                        }
+                    },
+                    {
+                        model: Role,
+                        attributes: ['roleName'],
+                        where: {
+                            roleName: RoleEnum.PASANTE
+                            // Solo usuarios cuyo rol es Pasante, agregar Becario
+                        }
+                    }
+                ]
+            });
+
+            return users.map(mapUserToDto);
+        }
+        throw new ForbiddenError();
+    }
+}
+
+export async function addUser(firstName: string, lastName: string, dni: string, phone_number: string, password: string, email: string, personalFile: string, roleId: string): Promise<User> {
+    //Valido que el usuario nio exista
+    const existingUser = await User.findOne({ where: { "user_email": email } });
+    if (existingUser) {
+        // throw new Error("El correo electrónico ya está en uso");
+        throw new EmailAlreadyExistsError();
+
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    //busco el estado pendiente
+    let status = await UserStatus.findOne({
+        where: {
+            "user_status_name": UserStatusEnum.PENDING
+        }
+    });
+    // console.log(status?.userStatusName)
+    if (!status) {
+        //throw new Error("Estado no encontrado");
+        throw new StatusNotFoundError();
+
+
+
+    }
+    //Valido que el rol ingresadoeste en la DB
+    let role = await Role.findByPk(roleId);
+    if (!role) {
+        throw new Error("Rol no encontrado");
+    }
+    //creo el usuario
+    const newUser = await User.build();
+    //newUser.userId = randomUUID(),
+    newUser.userFirstName = firstName,
+        newUser.userLastName = lastName,
+        newUser.userDni = dni,
+        newUser.userPhoneNumber = phone_number,
+        newUser.userEmail = email,
+        newUser.userPassword = hashedPassword,
+        newUser.userPersonalFile = personalFile,
+        newUser.createdDate = new Date(),
+        newUser.updatedDate = new Date(),
+        newUser.userStatusId = status.userStatusId;
+    newUser.userRoleId = role.roleId;
+    //await newUser.setUserStatus(status, {save: false}),
+    //await newUser.setUserRole(role, {save: false}); 
+    await newUser.save()
+    return newUser;
+}
+
+
+export async function getUser(id: string): Promise<OneUserDto> {
+    const user = await User.findByPk(id, {
+
+        include: [
+            {
+                model: Role,
+                attributes: ['roleName']
+            },
+            {
+                model: UserStatus,
+                attributes: ['userStatusName']
+            }
+        ]
+    });
+
+    if (!user) {
+        throw new UserNotFoundError();
+
+    }
+
+    return mapOneUserToDto(user);
+}
+
+
+export async function modifyUser(id: string, firstName: string, lastName: string, password: string, email: string, roleId: string): Promise<User | null> {
+
+    const user = await User.findByPk(id);
+    if (!user) {
+        return null; // Usuario no encontrado
+    }
+
+    user.userFirstName = firstName;
+    user.userLastName = lastName;
+    user.userEmail = email;
+    user.updatedDate = new Date();
+    //user.userPassword = await bcrypt.hash(password, 10); // Hashear la nueva contraseña
+    user.userRoleId = roleId; // Asignar el nuevo rol
+
+    await user.save(); // Guardar los cambios en la base de datos
+
+    return user;
+}
+
+
+
+export async function lowUser(id: string): Promise<void> {
+    try {
+        const user = await User.findByPk(id);
+        if (!user) {
+            throw new Error("Usuario no encontrado");
+        }
+        await user.destroy(); // Eliminar el usuario de la base de datos
+    } catch (error) {
+        throw new Error("Error al eliminar el usuario");
+    }
+}

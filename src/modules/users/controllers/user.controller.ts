@@ -1,0 +1,75 @@
+import { listUsers, addUser, getUser, modifyUser, lowUser} from "../services/user.service";
+import { Request, Response } from "express";
+import {AllUsersDto} from "../dtos/allUsers.dto"
+import { catchAsync } from '../../../utils/catchAsync';
+import { UserFilter } from "../dtos/userFilters.dto";
+
+
+
+export const  getAllUsers = catchAsync(async(req: Request, res: Response)=> {
+  const { userId } = (req as any).user;
+  const filters: UserFilter = {
+    search: req.query.search as string,
+    fromDate: req.query.fromDate ? new Date(req.query.fromDate as string) : undefined,
+    toDate: req.query.toDate ? new Date(req.query.toDate as string) : undefined
+};
+  
+    const users: AllUsersDto[] = await listUsers(userId, filters);
+    res.status(200).json({
+      success: true,
+      data: users
+    });
+})
+
+export const createUser = catchAsync(async(req: Request, res: Response) => {
+    const {firstName, lastName, dni, phone_number, password, email, personalFile, roleId} = req.body;
+     
+      const newUser = await addUser( firstName, lastName, dni, phone_number, password, email, personalFile, roleId);
+       // res.status(201).json(newUser);
+        res.status(201).json({
+          success: true,
+          messaje: "El usuario ha sido creado exitosamente. Recuerde que para acceder a la plataforma, su solicitud deberá ser aprobada por el administrador."
+      });
+    })
+
+
+export const getUserById = catchAsync(async(req: Request, res: Response)=> {
+  const userId = req.params.id; // Asegúrate de que el ID del usuario se pase como un parámetro en la URL
+    const user = await getUser(userId);
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+})
+
+
+export async function updateUser(req: Request, res: Response): Promise<void> {
+    const userId = req.params.id; // Asegúrate de que el ID del usuario se pase como un parámetro en la URL
+    const firstName = req.body.firstName;
+      const lastName = req.body.lastName;
+      const password = req.body.password;
+      const email = req.body.email;
+      const roleId = req.body.roleId;
+    try {
+    const user = await modifyUser(userId, firstName, lastName, password, email, roleId);
+    if(user !== null) {
+        res.status(200).json(user);
+      }
+         else {
+        res.status(404).json({ message: "Usuario no encontrado" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Error al actualizar el usuario" });
+    }
+}
+
+
+export async function deleteUser(req: Request, res: Response): Promise<void> {
+    const userId = req.params.id; // Asegúrate de que el ID del usuario se pase como un parámetro en la URL
+    try {
+       await lowUser(userId);
+       res.status(200).json({ message: "Usuario eliminado" });
+    } catch (error) {
+        res.status(500).json({ message: "Error al eliminar el usuario" });
+    }
+}
