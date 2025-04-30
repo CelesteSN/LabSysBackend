@@ -34,8 +34,9 @@ app.use(errorHandler);
     await sequelize.authenticate();
     console.log('Conexión con PostgreSQL OK 🔌');
     await sequelize.sync(); // ¡sincroniza modelos con la base de datos!
-    app.listen(3000, () => {
-      console.log('Servidor corriendo en http://localhost:3000');
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error('Error conectando a la base de datos:', error);

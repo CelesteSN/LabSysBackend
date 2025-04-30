@@ -11,3 +11,11 @@ export const sequelize = new Sequelize(
     logging: false,
   }
 );
+
+// import { Sequelize } from 'sequelize';
+
+// export const sequelize = new Sequelize(process.env.DATABASE_URL!, {
+//   dialect: 'postgres',
+//   protocol: 'postgres',
+//   logging: false,
+// });
