@@ -1,4 +1,15 @@
-# Node modules
+# Node
 node_modules/
-.env/
-package-lock.json/
+dist/
+.env
+package-lock.json
+
+# Logs
+logs
+*.log
+
+# OS
+.DS_Store
+
+# TypeScript build files
+*.tsbuildinfo
