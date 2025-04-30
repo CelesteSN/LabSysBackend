@@ -10,6 +10,7 @@ import 'express-async-errors'; // MUY IMPORTANTE para capturar errores async
 import { errorHandler } from './middlewares/errorHandler';
 import { notificationRouter } from './modules/notifications/routes/notification.route';
 import dotenv from 'dotenv';
+//import {connectToDatabase} from './config/database2';
 dotenv.config();
 
 
@@ -32,6 +33,7 @@ app.use(errorHandler);
 (async () => {
   try {
     await sequelize.authenticate();
+    //await connectToDatabase();
     console.log('Conexión con PostgreSQL OK 🔌');
     await sequelize.sync(); // ¡sincroniza modelos con la base de datos!
     const PORT = process.env.PORT || 3000;
