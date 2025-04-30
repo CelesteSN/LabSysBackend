@@ -8,7 +8,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const app_1 = require("../config/app");
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader === null || authHeader === void 0 ? void 0 : authHeader.split(' ')[1];
+    const token = authHeader?.split(' ')[1];
     if (!token) {
         return res.status(401).json({ message: 'Token no proporcionado' });
     }

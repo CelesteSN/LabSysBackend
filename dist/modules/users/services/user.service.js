@@ -28,21 +28,21 @@ async function listUsers(userId, filters) {
     }
     // Construimos condiciones dinámicas
     const whereConditions = {};
-    if (filters === null || filters === void 0 ? void 0 : filters.search) {
+    if (filters?.search) {
         whereConditions[sequelize_1.Op.or] = [
             { userFirstName: { [sequelize_1.Op.iLike]: `%${filters.search}%` } },
             { userLastName: { [sequelize_1.Op.iLike]: `%${filters.search}%` } }
         ];
     }
-    if (filters === null || filters === void 0 ? void 0 : filters.fromDate) {
+    if (filters?.fromDate) {
         whereConditions.createdDate = { ...whereConditions.createdDate, [sequelize_1.Op.gte]: filters.fromDate };
     }
-    if (filters === null || filters === void 0 ? void 0 : filters.toDate) {
+    if (filters?.toDate) {
         whereConditions.createdDate = { ...whereConditions.createdDate, [sequelize_1.Op.lte]: filters.toDate };
     }
     //Obtengo el rol del usuario logueado para verificar que tipo de listado debe visualizar
     const roleUser = await loguedUser.getRole();
-    if ((roleUser === null || roleUser === void 0 ? void 0 : roleUser.roleName) == role_enum_1.RoleEnum.ADMIN) {
+    if (roleUser?.roleName == role_enum_1.RoleEnum.ADMIN) {
         //throw new Error('No autorizado para listar usuarios'); // O podés lanzar un ForbiddenError
         const users = await user_model_1.User.findAll({
             where: whereConditions,
@@ -74,7 +74,7 @@ async function listUsers(userId, filters) {
         return users.map(allUsers_dto_1.mapUserToDto);
     }
     else {
-        if ((roleUser === null || roleUser === void 0 ? void 0 : roleUser.roleName) == role_enum_1.RoleEnum.TUTOR) {
+        if (roleUser?.roleName == role_enum_1.RoleEnum.TUTOR) {
             const users = await user_model_1.User.findAll({
                 where: whereConditions,
                 attributes: [
@@ -186,7 +186,7 @@ async function addAnswer(userLoguedId, userId, isAccept, comment) {
                 'userStatusName': userStatus_enum_1.UserStatusEnum.ACTIVE
             }
         });
-        userPending.setUserStatus(activeStatus === null || activeStatus === void 0 ? void 0 : activeStatus.userStatusId);
+        userPending.setUserStatus(activeStatus?.userStatusId);
         userPending.updatedDate = new Date();
         userPending.save();
     }
@@ -198,7 +198,7 @@ async function addAnswer(userLoguedId, userId, isAccept, comment) {
                 'userStatusName': userStatus_enum_1.UserStatusEnum.REJECTED
             }
         });
-        userPending.setUserStatus(rejectedStatus === null || rejectedStatus === void 0 ? void 0 : rejectedStatus.userStatusId);
+        userPending.setUserStatus(rejectedStatus?.userStatusId);
         userPending.updatedDate = new Date();
         userPending.userDisabledReason = comment;
         userPending.save();
