@@ -2,15 +2,23 @@ import { Sequelize } from 'sequelize';
  //import dotenv from 'dotenv';
 
 export const sequelize = new Sequelize(
-  process.env.DB_NAME || 'pps_db',
-  process.env.DB_USER || 'postgres',
-  process.env.DB_PASSWORD || 'celeste123',
-  {
-    host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT) || 5432,
-    dialect: 'postgres',
-    logging: false,
-  }
+	process.env.DB_NAME || "pps_db_bout",
+	process.env.DB_USER || "pps_db_bout_user",
+	process.env.DB_PASSWORD || "LFQNpQRhuYJNfimBxQs5kU8CdkAl70ul",
+	{
+		host:
+			process.env.DB_HOST ||
+			"dpg-d08otcp5pdvs739o54v0-a.oregon-postgres.render.com",
+		port: Number(process.env.DB_PORT) || 5432,
+		dialect: "postgres",
+		logging: false,
+		dialectOptions: {
+			ssl: {
+				require: true,
+				rejectUnauthorized: false, // necesario para evitar error de certificado
+			},
+		},
+	}
 );
 
 
