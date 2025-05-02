@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { loginUser, recoveryPassword } from '../services/auth.service';
 import { catchAsync } from '../../../utils/catchAsync';
+import { logoutService } from '../services/auth.service';
+
 
 export const loginController = async (req: Request, res: Response) => {
   try {
@@ -19,3 +21,19 @@ export const requestPasswordReset = catchAsync(async (req: Request, res: Respons
     success: true,
     message: 'Se le ha enviado un correo electrónico con las instrucciones para continuar el proceso de desbloqueo o cambio de contraseña. Recuerde que tiene una vigencia de 24 horas. Por favor, valide que el correo no se encuentre en la bandeja de spam.'});
 });
+
+
+
+
+
+export const logout = async (req: Request, res: Response) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(400).json({ mensaje: 'Token faltante' });
+
+  try {
+    await logoutService(token);
+    res.status(200).json({ mensaje: 'Sesión cerrada correctamente' });
+  } catch (error) {
+    res.status(400).json({ mensaje: (error as Error).message });
+  }
+};

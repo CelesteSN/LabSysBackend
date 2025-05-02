@@ -12,16 +12,25 @@ import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNo
 import { UserFilter } from "../dtos/userFilters.dto";
 import { Op, where } from 'sequelize';
 import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
+import { sendEmail } from '../../notifications/services/notification.service';
 
 
 
-export async function listUsers(userId: string, filters?: UserFilter): Promise<AllUsersDto[]> {
 
-    //Obtengo el usuario logueado
-    const loguedUser = await User.findByPk(userId);
+export async function listUsers(userLoguedId: string, filters?: UserFilter): Promise<AllUsersDto[]> {
+
+    //Bloque para validar usuario existente y activo
+    const loguedUser = await User.findByPk(userLoguedId);
     if (!loguedUser) {
         throw new UserNotFoundError();
     }
+
+    const userLoguedStatus = await loguedUser.getUserStatus();
+
+    if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
+        throw new Error("No puede accedr a esta funcionalidad")
+    }
+
 
 
     // Construimos condiciones dinámicas
@@ -110,10 +119,15 @@ export async function listUsers(userId: string, filters?: UserFilter): Promise<A
             return users.map(mapUserToDto);
         }
         throw new ForbiddenError();
+
+
     }
+
 }
 
-export async function addUser(firstName: string, lastName: string, dni: string,  password: string, email: string, personalFile: string, roleId: string, phone_number?: string ): Promise<User> {
+
+
+export async function addUser(firstName: string, lastName: string, dni: string, password: string, email: string, personalFile: string, roleId: string, phone_number?: string): Promise<User> {
     //Valido que el usuario nio exista
     const existingUser = await User.findOne({ where: { "user_email": email } });
     if (existingUser) {
@@ -144,28 +158,44 @@ export async function addUser(firstName: string, lastName: string, dni: string, 
     }
     //creo el usuario
     const newUser = await User.build({
-    //newUser.userId = randomUUID(),
-        userFirstName : firstName,
-        userLastName : lastName,
-        userDni : dni,
-        userEmail : email,
-        userPassword : hashedPassword,
-        userPersonalFile : personalFile,
-        createdDate : new Date(),
-        updatedDate : new Date(),
-        userStatusId : status.userStatusId,
-        userRoleId : role.roleId,
+        //newUser.userId = randomUUID(),
+        userFirstName: firstName,
+        userLastName: lastName,
+        userDni: dni,
+        userEmail: email,
+        userPassword: hashedPassword,
+        userPersonalFile: personalFile,
+        createdDate: new Date(),
+        updatedDate: new Date(),
+        userStatusId: status.userStatusId,
+        userRoleId: role.roleId,
         userPhoneNumber: phone_number ?? undefined  // <-- solo si tenés que pasarlo opcional
 
     });
-    
+
 
     await newUser.save()
     return newUser;
 }
 
 
-export async function getUser(id: string): Promise<OneUserDto> {
+export async function getUser(userLoguedId: string, id: string): Promise<OneUserDto> {
+
+
+    //Bloque para validar usuario existente y activo
+    const loguedUser = await User.findByPk(userLoguedId);
+    if (!loguedUser) {
+        throw new UserNotFoundError();
+    }
+
+    const userLoguedStatus = await loguedUser.getUserStatus();
+
+    if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
+        throw new Error("No puede accedr a esta funcionalidad")
+    }
+
+
+    //Busco el usuario para id seleccionado
     const user = await User.findByPk(id, {
 
         include: [
@@ -188,19 +218,43 @@ export async function getUser(id: string): Promise<OneUserDto> {
     return mapOneUserToDto(user);
 }
 
-export async function addAnswer(userLoguedId: string, userId: string, isAccept: string, comment: string) {
+export async function addAnswer(userLoguedId: string, userId: string, isAccept: string, comment?: string) {
     //Obtengo el usuario logueado
     const loguedUser = await User.findByPk(userLoguedId);
     if (!loguedUser) {
         throw new UserNotFoundError();
     }
 
+    const userLoguedStatus = await loguedUser.getUserStatus();
+
+    if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
+        throw new Error("No puede acceder a esta funcionalidad")
+    }
+
+
     //Obtengo el usuario al que le quiero responder la solicitud de alta
-    const userPending = await User.findByPk(userId);
+    //const userPending = await User.findByPk(userId)
+
+
+    const userPending = await User.findByPk(userId,{
+        include: [
+            {
+                model: UserStatus,
+                attributes: ['userStatusName'],
+                where: {
+                    userStatusName: UserStatusEnum.PENDING
+                    // Solo usuarios en estado Pending
+                }
+            },
+        ]
+    })
+
     if (!userPending) {
         throw new UserNotFoundError();
     }
 
+
+    const userPendingRole = userPending.getRole()
     //Lo acepto en la plataforma
     if (isAccept == "true") {
         const activeStatus = await UserStatus.findOne({
@@ -213,25 +267,41 @@ export async function addAnswer(userLoguedId: string, userId: string, isAccept: 
         userPending.setUserStatus(activeStatus?.userStatusId)
         userPending.updatedDate = new Date()
         userPending.save();
+        const html = `
+            <p>Estimado/a ${userPending.userFirstName},</p>
+            <p>Su usuario con permiso ${(await userPendingRole).roleName} ha sido dado de alta satisfactoriamente.</p>
+            <p>Para inicar sesión en la paltaforma, ingrese a traves del siguiente botón: Iniciar sesión":</p>
+                <p>Muchas gracias.</p>
+          `;
 
+        await sendEmail(userPending.userEmail, 'Respuesta de alta de usuario', html);
     }
     else {
         //No lo acepto en la plataforma
-       // if (isAccept == "false") {
-            const rejectedStatus = await UserStatus.findOne({
-                where: {
-                    'userStatusName': UserStatusEnum.REJECTED
-                }
+        // if (isAccept == "false") {
+        const rejectedStatus = await UserStatus.findOne({
+            where: {
+                'userStatusName': UserStatusEnum.REJECTED
             }
-
-            )
-            userPending.setUserStatus(rejectedStatus?.userStatusId);
-            userPending.updatedDate = new Date();
-            userPending.userDisabledReason = comment;
-            userPending.save();
         }
 
+        )
+        userPending.setUserStatus(rejectedStatus?.userStatusId);
+        userPending.updatedDate = new Date();
+        userPending.userDisabledReason = comment;
+        userPending.save();
+        const html = `
+            <p>Estimado/a ${userPending.userFirstName},</p>
+            <p>Su usuario con permiso ${(await userPendingRole).roleName} ha sido fue rechazada.</p>
+            <p>Motivo de rechazo: ${comment}</p>
+                <p>Muchas gracias.</p>
+          `;
+
+
+          await sendEmail(userPending.userEmail, 'Respuesta de alta de usuario', html);
     }
+
+}
 //}
 
 export async function modifyUser(id: string, firstName: string, lastName: string, password: string, email: string, roleId: string): Promise<User | null> {

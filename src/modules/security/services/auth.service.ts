@@ -9,6 +9,8 @@ import {UserStatusEnum} from '../enums/userStatus.enum';
 import { sendEmail } from '../../notifications/services/notification.service';
 
 // import { generateRecoveryToken } from './auth.utils'; // si usás JWT
+// src/modules/security/services/auth.service.ts
+import { BlackListToken } from '../models/blackListToken.model';
 
 
 export const loginUser = async (loginData: LoginDto) => {
@@ -55,7 +57,7 @@ export const loginUser = async (loginData: LoginDto) => {
     }
   }
   }else{
-    throw new Error("La cuenta está pendiente de aprobación. No podés iniciar sesión por el momento")
+    throw new Error("No podés iniciar sesión por el momento")
   };
 };
 
@@ -87,3 +89,19 @@ export async function recoveryPassword(email: string): Promise<void> {
 }
 
 
+
+
+
+
+export async function logoutService(token: string): Promise<void> {
+  const decoded: any = jwt.decode(token);
+
+  if (!decoded?.exp) {
+    throw new Error('Token inválido');
+  }
+
+  await BlackListToken.create({
+    token,
+    expires_at: new Date(decoded.exp * 1000)
+  });
+}

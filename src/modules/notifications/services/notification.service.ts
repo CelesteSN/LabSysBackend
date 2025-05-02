@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport(mailConfig);
 
 export async function sendEmail(to: string, subject: string, htmlContent: string): Promise<void> {
   const mailOptions = {
-    from: `"Celeste UTN" <${mailConfig.auth.user}>`,
+    from: `"LabSys" <${mailConfig.auth.user}>`,
     to,
     subject,
     html: htmlContent
