@@ -1,5 +1,5 @@
 import { User } from "../models/user.model";
-import bcrypt from 'bcrypt';
+import bcrypt, { hashSync } from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { LoginDto } from '../dtos/auth.dto';
 import { appConfig } from '../../../config/app';
@@ -63,16 +63,26 @@ export const loginUser = async (loginData: LoginDto) => {
 
 
 
-
+//solicitud para recuperar la contraseña
 export async function recoveryPassword(email: string): Promise<void> {
   const user = await User.findOne({ where: { userEmail: email } });
 
   if (!user) {
-    throw new Error('Usuario no encontrado');
+  // throw new Error('Usuario no encontrado');
+    const error = new Error("No se encontró el usuario");
+  error.name = "NotFoundError"; // para diferenciarlo en el handler
+  throw error;
   }
 
   // 🔐 Token para recuperar contraseña (ejemplo)
-  const token = `abc123token`; // reemplazá esto con un JWT firmado o uuid
+  //const token = `abc123token`; // reemplazá esto con un JWT firmado o uuid
+
+
+  const token = jwt.sign(
+    { userId: user.userId },               // payload
+    process.env.JWT_SECRET!,              // clave secreta desde .env
+    { expiresIn: '24h' }                   // duración del token
+  );
 
   const recoveryLink = `https://tu-app.com/reset-password/${token}`;
 
@@ -92,7 +102,43 @@ export async function recoveryPassword(email: string): Promise<void> {
 
 
 
+//validación del token en el link
+export async function verifyRecoveryTokenService(token: string) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
 
+    const user = await User.findByPk(decoded.userId);
+    if (!user) {
+      return { success: false, status: 404, message: 'Usuario no encontrado' };
+    }
+
+    return { success: true, status: 200, message: 'Token válido', userId: user.userId };
+  } catch (error) {
+    return { success: false, status: 400, message: 'Token inválido o expirado' };
+  }
+}
+
+
+//Cambio de contraeña
+export async function recoveryPasswordSaveService(userId: string, password: string){
+const userNewPassword = await User.findByPk(userId);
+if(!userNewPassword){
+  return { success: false, status: 404, message: 'Usuario no encontrado' };
+}
+
+userNewPassword.userPassword = await bcrypt.hash(password, 10);
+userNewPassword.updatedDate = new Date(),
+await userNewPassword.save()
+
+return {
+  success: true,
+  status: 200,
+  message: 'Se cambió la contraseña exitosamente'
+};
+
+}
+
+//logout
 export async function logoutService(token: string): Promise<void> {
   const decoded: any = jwt.decode(token);
 

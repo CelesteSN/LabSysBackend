@@ -13,6 +13,7 @@ import { UserFilter } from "../dtos/userFilters.dto";
 import { Op, where } from 'sequelize';
 import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
 import { sendEmail } from '../../notifications/services/notification.service';
+import {AllRoleDto, mapRoleToDto}  from '../dtos/allRole.dto';
 
 
 
@@ -335,4 +336,13 @@ export async function lowUser(id: string): Promise<void> {
     } catch (error) {
         throw new Error("Error al eliminar el usuario");
     }
+}
+
+
+export async function allRoleService(): Promise<AllRoleDto[]>{
+    const allRole = await Role.findAll();
+    if(allRole.length == 0){
+        throw new Error("Roles no encontrados");
+    }
+    return allRole.map(mapRoleToDto);
 }

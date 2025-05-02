@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { loginUser, recoveryPassword } from '../services/auth.service';
+import { loginUser, recoveryPassword, verifyRecoveryTokenService, recoveryPasswordSaveService, logoutService} from '../services/auth.service';
 import { catchAsync } from '../../../utils/catchAsync';
-import { logoutService } from '../services/auth.service';
+
 
 
 export const loginController = async (req: Request, res: Response) => {
@@ -25,6 +25,24 @@ export const requestPasswordReset = catchAsync(async (req: Request, res: Respons
 
 
 
+
+
+
+export async function verifyRecoveryToken(req: Request, res: Response) {
+  const { token } = req.params;
+
+  const result = await verifyRecoveryTokenService(token);
+  return res.status(result.status).json(result.success ? { message: result.message, userId: result.userId } : { message: result.message });
+};
+
+
+export async function saveNewPassword(req: Request, res: Response){
+  const { password, userId } = req.body;
+
+  const result = await recoveryPasswordSaveService(userId, password);
+
+  return res.status(result.status).json({ message: result.message });
+};
 
 export const logout = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.split(' ')[1];

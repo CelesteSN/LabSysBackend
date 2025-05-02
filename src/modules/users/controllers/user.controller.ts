@@ -1,4 +1,4 @@
-import { listUsers, addUser, getUser, modifyUser, lowUser, addAnswer } from "../services/user.service";
+import { listUsers, addUser, getUser, modifyUser, lowUser, addAnswer, allRoleService } from "../services/user.service";
 import { Request, Response } from "express";
 import { AllUsersDto } from "../dtos/allUsers.dto"
 import { catchAsync } from '../../../utils/catchAsync';
@@ -100,3 +100,19 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     res.status(500).json({ message: "Error al eliminar el usuario" });
   }
 }
+
+export const showAllRole = catchAsync(async(req: Request, res: Response)=>{
+  const roles = await allRoleService();
+
+  if (roles.length === 0) {
+    return res.status(200).json({
+      success: true,
+      mensaje: 'No se encontraron resultados',
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: roles
+  });
+})
