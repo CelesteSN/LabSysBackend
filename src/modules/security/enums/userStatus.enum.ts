@@ -4,5 +4,5 @@ export enum UserStatusEnum {
     BLOCKED = "Bloqueado",
     DELETED = "Dado de baja",
     INACTIVE = "Inactivo",
-    REJECTED = "Rejected"
+    REJECTED = "Rechazado"
 }

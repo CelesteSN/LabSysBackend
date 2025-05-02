@@ -113,7 +113,7 @@ export async function listUsers(userId: string, filters?: UserFilter): Promise<A
     }
 }
 
-export async function addUser(firstName: string, lastName: string, dni: string, phone_number: string, password: string, email: string, personalFile: string, roleId: string): Promise<User> {
+export async function addUser(firstName: string, lastName: string, dni: string,  password: string, email: string, personalFile: string, roleId: string, phone_number?: string ): Promise<User> {
     //Valido que el usuario nio exista
     const existingUser = await User.findOne({ where: { "user_email": email } });
     if (existingUser) {
@@ -143,21 +143,23 @@ export async function addUser(firstName: string, lastName: string, dni: string, 
         throw new Error("Rol no encontrado");
     }
     //creo el usuario
-    const newUser = await User.build();
+    const newUser = await User.build({
     //newUser.userId = randomUUID(),
-    newUser.userFirstName = firstName,
-        newUser.userLastName = lastName,
-        newUser.userDni = dni,
-        newUser.userPhoneNumber = phone_number,
-        newUser.userEmail = email,
-        newUser.userPassword = hashedPassword,
-        newUser.userPersonalFile = personalFile,
-        newUser.createdDate = new Date(),
-        newUser.updatedDate = new Date(),
-        newUser.userStatusId = status.userStatusId;
-    newUser.userRoleId = role.roleId;
-    //await newUser.setUserStatus(status, {save: false}),
-    //await newUser.setUserRole(role, {save: false}); 
+        userFirstName : firstName,
+        userLastName : lastName,
+        userDni : dni,
+        userEmail : email,
+        userPassword : hashedPassword,
+        userPersonalFile : personalFile,
+        createdDate : new Date(),
+        updatedDate : new Date(),
+        userStatusId : status.userStatusId,
+        userRoleId : role.roleId,
+        userPhoneNumber: phone_number ?? undefined  // <-- solo si tenés que pasarlo opcional
+
+    });
+    
+
     await newUser.save()
     return newUser;
 }

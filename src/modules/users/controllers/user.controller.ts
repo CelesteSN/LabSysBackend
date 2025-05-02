@@ -25,7 +25,7 @@ export const  getAllUsers = catchAsync(async(req: Request, res: Response)=> {
 export const createUser = catchAsync(async(req: Request, res: Response) => {
     const {firstName, lastName, dni, phone_number, password, email, personalFile, roleId} = req.body;
      
-      const newUser = await addUser( firstName, lastName, dni, phone_number, password, email, personalFile, roleId);
+      const newUser = await addUser( firstName, lastName, dni, password, email, personalFile, roleId, phone_number);
        // res.status(201).json(newUser);
         res.status(201).json({
           success: true,

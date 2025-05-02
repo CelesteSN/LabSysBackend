@@ -55,7 +55,7 @@ export const loginUser = async (loginData: LoginDto) => {
     }
   }
   }else{
-    throw new Error("El usuario no es válido")
+    throw new Error("La cuenta está pendiente de aprobación. No podés iniciar sesión por el momento")
   };
 };
 

@@ -6,7 +6,7 @@ export type OneUserDto = {
     name: string;
     dni: string
     email: string;
-    phoneNumber: string;
+    phoneNumber?: string;
     personalFile: string;
     status: string;
     role: string;

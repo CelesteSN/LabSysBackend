@@ -16,7 +16,7 @@ import {
     declare userFirstName: string;
     declare userLastName: string;
     declare userDni: string
-    declare userPhoneNumber: string;
+    declare userPhoneNumber?: string;
     declare userPassword: string;
     declare userEmail: string;
     declare userPersonalFile: string;
@@ -68,7 +68,7 @@ import {
     userPhoneNumber: {
       field: "user_phone_number",
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: true
     },
     userPassword: {
       field: "user_password",
