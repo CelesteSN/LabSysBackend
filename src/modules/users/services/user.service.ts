@@ -91,7 +91,8 @@ const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'tod
                         attributes: ['roleName'],
                         ...(isSpecificRole
                           ? { where: { roleName: normalizedRole } }
-                          : {} // no aplica filtro → trae todos
+                          : { where: { roleName: { [Op.not]: 'Tutor' } } } // no se especificó → excluye "Tutor"
+                          //: {} // no aplica filtro → trae todos
                         )
                       }
                       

@@ -39,7 +39,6 @@ export const searchValidation = Joi.object({
 
   role: Joi.string()
   .valid(
-    'Tutor',
     'Pasante',
     'Becario',
     'Coordinador'
