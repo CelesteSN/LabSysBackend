@@ -6,6 +6,7 @@ import { UserFilter } from "../dtos/userFilters.dto";
 import { boolean } from "joi";
 import { UserStatusEnum } from "../enums/userStatus.enum";
 import { RoleEnum } from "../enums/role.enum";
+import { ResponseUserEnum } from "../enums/responseUser.enum";
 
 
 
@@ -63,12 +64,12 @@ export const answerUser = catchAsync(async (req: Request, res: Response) => {
   const { userLoguedId } = (req as any).user;
 
   const userId = req.params.id;
-  const isAccept = String(req.query.isAccept);
+  const response = req.body.response as ResponseUserEnum;
   const comment = req.body.comment;
-  await addAnswer(userLoguedId, userId, isAccept, comment);
+  await addAnswer(userLoguedId, userId, response, comment);
   res.status(201).json({
     success: true,
-    messaje: "Solicitud respondida exitosamente"
+    messaje: "Solicitud respondida exitosamente, se envió un email notificando al usuario"
   })
 })
 

@@ -14,6 +14,7 @@ import { Op, where } from 'sequelize';
 import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
 import { sendEmail } from '../../notifications/services/notification.service';
 import {AllRoleDto, mapRoleToDto}  from '../dtos/allRole.dto';
+import { ResponseUserEnum } from "../enums/responseUser.enum";
 
 
 
@@ -201,7 +202,7 @@ export async function getUser(userLoguedId: string, id: string): Promise<OneUser
     return mapOneUserToDto(user);
 }
 
-export async function addAnswer(userLoguedId: string, userId: string, isAccept: string, comment?: string) {
+export async function addAnswer(userLoguedId: string, userId: string, response: ResponseUserEnum, comment?: string) {
     //Obtengo el usuario logueado
     const loguedUser = await User.findByPk(userLoguedId);
     if (!loguedUser) {
@@ -239,7 +240,7 @@ export async function addAnswer(userLoguedId: string, userId: string, isAccept: 
 
     const userPendingRole = userPending.getRole()
     //Lo acepto en la plataforma
-    if (isAccept == "true") {
+    if (response == ResponseUserEnum.ACCEPTED) {
         const activeStatus = await UserStatus.findOne({
             where: {
                 'userStatusName': UserStatusEnum.ACTIVE
