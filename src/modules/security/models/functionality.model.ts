@@ -2,9 +2,9 @@ import { DataTypes, Model, UUIDV4} from "sequelize";
 import { sequelize } from '../../../config/database';
 
 
-export class Role extends Model{
-declare roleId: string;
-declare roleName: string;
+export class Functionality extends Model{
+declare functionalityId: string;
+declare functionalityName: string;
 declare createdDate: Date;
 declare updatedDate: Date;
 declare deletedDate?: Date | null;
@@ -12,17 +12,17 @@ declare deletedDate?: Date | null;
 
 
 }
-Role.init(
+Functionality.init(
     {
-        roleId:{
-        field: "role_id",
+        functionalityId:{
+        field: "functionality_id",
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: UUIDV4
     },
-    roleName:{
+    functionalityName:{
         type: DataTypes.STRING,
-        field: "role_name",
+        field: "functionality_name",
         allowNull: false
     },
        createdDate:{
@@ -43,10 +43,11 @@ Role.init(
     },
     {
         sequelize,
-        modelName: 'Role',
-        tableName: 'role',
+        modelName: 'Functionality',
+        tableName: 'functionality',
         timestamps: false,
       }
     );
 
-   
+  
+      

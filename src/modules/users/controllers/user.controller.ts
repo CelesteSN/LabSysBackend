@@ -4,6 +4,8 @@ import { AllUsersDto } from "../dtos/allUsers.dto"
 import { catchAsync } from '../../../utils/catchAsync';
 import { UserFilter } from "../dtos/userFilters.dto";
 import { boolean } from "joi";
+import { UserStatusEnum } from "../enums/userStatus.enum";
+import { RoleEnum } from "../enums/role.enum";
 
 
 
@@ -12,7 +14,10 @@ export const getAllUsers = catchAsync(async (req: Request, res: Response) => {
   const filters: UserFilter = {
     search: req.query.search as string,
     fromDate: req.query.fromDate ? new Date(req.query.fromDate as string) : undefined,
-    toDate: req.query.toDate ? new Date(req.query.toDate as string) : undefined
+    toDate: req.query.toDate ? new Date(req.query.toDate as string) : undefined,
+    status: req.query.status as UserStatusEnum || undefined,
+    role: req.query.role as RoleEnum || undefined,
+
   };
 
   const users: AllUsersDto[] = await listUsers(userLoguedId, filters);

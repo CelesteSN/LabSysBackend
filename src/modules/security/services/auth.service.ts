@@ -11,6 +11,13 @@ import { sendEmail } from '../../notifications/services/notification.service';
 // import { generateRecoveryToken } from './auth.utils'; // si usás JWT
 // src/modules/security/services/auth.service.ts
 import { BlackListToken } from '../models/blackListToken.model';
+import { Role } from '../models/role.model';
+import { Functionality } from '../models/functionality.model';
+import { where } from "sequelize";
+import RoleFunctionality from "../models/roleFunctionality.model";
+import { RoleFunctionalityDto } from "../dtos/roleFunctionality.dto";
+import FunctionalityDto from "../dtos/functionality.dto";
+
 
 
 export const loginUser = async (loginData: LoginDto) => {
@@ -151,3 +158,52 @@ export async function logoutService(token: string): Promise<void> {
     expires_at: new Date(decoded.exp * 1000)
   });
 }
+
+
+
+
+
+// export const getFunctionalitiesByRoleId = async (roleId: string) => {
+
+
+//   return await RoleFunctionality.findAll({
+//     where:{
+//       "role_id": roleId
+//     },
+//     include: Functionality
+//   }).then((functionalities) => {
+//     if (!functionalities) return []
+//     return functionalities.map((functionality) => {
+//         return functionality.Functionality.functionalityName
+//     })
+// })
+// }
+
+
+
+
+export const getFunctionalitiesByRoleId = async (roleId: string): Promise<RoleFunctionalityDto | null> => {
+  const roleFunctionalities = await RoleFunctionality.findAll({
+    where:{
+            "role_id": roleId
+          },
+          include: Functionality,
+
+  });
+
+  if (!roleFunctionalities.length) return null;
+
+  //const role = roleFunctionalities[0].Role;
+  const role = await Role.findByPk(roleId);
+  if(!role){throw new Error("Rol no válido")};
+  const functionalityDtos: FunctionalityDto[] = roleFunctionalities.map(rf => ({
+   // id: rf.Functionality.functionalityId,
+   functionalityName: rf.Functionality.functionalityName,
+  }));
+
+  return {
+   // id: role.roleId,
+    nameRole: role.roleName,
+    functionality: roleFunctionalities.map(rf => rf.Functionality.functionalityName)
+  };
+};

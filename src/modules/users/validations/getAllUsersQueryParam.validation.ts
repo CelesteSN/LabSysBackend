@@ -22,5 +22,31 @@ export const searchValidation = Joi.object({
       'date.base': 'La fecha hasta debe ser una fecha válida.',
       'date.min': 'La fecha hasta no puede ser anterior a la fecha desde.',
       'date.format': 'La fecha hasta debe estar en formato ISO (YYYY-MM-DD).'
+    }),
+    status: Joi.string()
+    .valid(
+      'Activo',
+      'Pendiente',
+      'Bloqueado',
+      'Dado de baja',
+      'Inactivo',
+      'Rechazado',
+      'Todos'
+    )
+    .messages({
+      'any.only': 'El estado ingresado no es válido.'
+    }),
+
+  role: Joi.string()
+  .valid(
+    'Tutor',
+    'Pasante',
+    'Becario',
+    'Coordinador'
+  )
+    .messages({
+      'string.base': 'El rol debe ser un texto válido.'
     })
+
+
 });

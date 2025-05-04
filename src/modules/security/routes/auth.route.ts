@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { loginController, requestPasswordReset, verifyRecoveryToken, saveNewPassword,logout } from '../controllers/auth.controller';
+import { loginController, requestPasswordReset, verifyRecoveryToken, saveNewPassword,logout, getRoleFunctionalitiesController  } from '../controllers/auth.controller';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { loginValidation } from '../validations/loginValidation';
 import {recoveryPasswordValidation} from '../validations/recoveryPasswordValidation';
@@ -12,6 +12,7 @@ import {resetPasswordValidation} from '../validations/resetPasswordValidation';
 
 const router = Router();
 
+router.get('/role/:id', getRoleFunctionalitiesController );
 router.post('/login', validateRequest({body: loginValidation}), loginController);
 router.post('/recovery-password', validateRequest({body: recoveryPasswordValidation}), requestPasswordReset);
 router.get('/verify-recovery/:token', verifyRecoveryToken);

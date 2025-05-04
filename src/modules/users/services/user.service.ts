@@ -37,6 +37,17 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
     // Construimos condiciones dinámicas
     const whereConditions: any = {};
 
+
+    const statusRaw = filters?.status?.trim(); // elimina espacios
+    const status = statusRaw ?? UserStatusEnum.PENDING; // si no viene, usar "Pendiente"
+    const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
+
+
+    const normalizedRole = filters?.role?.trim();
+const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
+
+    
+
     if (filters?.search) {
         whereConditions[Op.or] = [
             { userFirstName: { [Op.iLike]: `%${filters.search}%` } },
@@ -52,9 +63,9 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
         whereConditions.createdDate = { ...whereConditions.createdDate, [Op.lte]: filters.toDate };
     }
 
-    //Obtengo el rol del usuario logueado para verificar que tipo de listado debe visualizar
+    //Obtengo el rol del usuario logueado para verificar sI  es tutor
     const roleUser = await loguedUser.getRole();
-    if (roleUser?.roleName == RoleEnum.ADMIN) {
+    if (roleUser?.roleName == RoleEnum.TUTOR) {
         //throw new Error('No autorizado para listar usuarios'); // O podés lanzar un ForbiddenError
 
         const users = await User.findAll({
@@ -67,59 +78,30 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
             ],
             include: [
                 {
-                    model: UserStatus,
-                    attributes: ['userStatusName'],
-                    where: {
-                        userStatusName: UserStatusEnum.PENDING
-                        // Solo usuarios en estado Pending
-                    }
+                  model: UserStatus,
+                  attributes: ['userStatusName'],
+                  ...(isStatusAll ? {} : { where: { userStatusName: status } })
                 },
-                {
-                    model: Role,
-                    attributes: ['roleName'],
-                    where: {
-                        roleName: RoleEnum.TUTOR
-                        // Solo usuarios cuyo rol es Responsable
-                    }
-                }
+              
+              
+                
+                    {
+                        model: Role,
+                        attributes: ['roleName'],
+                        ...(isSpecificRole
+                          ? { where: { roleName: normalizedRole } }
+                          : {} // no aplica filtro → trae todos
+                        )
+                      }
+                      
             ]
         });
 
         return users.map(mapUserToDto);
     }
     else {
-        if (roleUser?.roleName == RoleEnum.TUTOR) {
-            const users = await User.findAll({
-                where: whereConditions,
-                attributes: [
-                    'userId',
-                    'userFirstName',
-                    'userLastName',
-                    'createdDate'
-                ],
-                include: [
-                    {
-                        model: UserStatus,
-                        attributes: ['userStatusName'],
-                        where: {
-                            userStatusName: UserStatusEnum.PENDING
-                            // Solo usuarios en estado Pending
-                        }
-                    },
-                    {
-                        model: Role,
-                        attributes: ['roleName'],
-                        where: {
-                            roleName: RoleEnum.PASANTE
-                            // Solo usuarios cuyo rol es Pasante, agregar Becario
-                        }
-                    }
-                ]
-            });
-
-            return users.map(mapUserToDto);
-        }
-        throw new ForbiddenError();
+        
+        throw new Error("No puede acceder a esta funcionalidad");
 
 
     }
