@@ -45,7 +45,7 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
 
 
     const normalizedRole = filters?.role?.trim();
-const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
+    const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
 
     
 

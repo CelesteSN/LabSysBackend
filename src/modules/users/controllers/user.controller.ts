@@ -67,7 +67,7 @@ export const answerUser = catchAsync(async (req: Request, res: Response) => {
   const response = req.body.response as ResponseUserEnum;
   const comment = req.body.comment;
   await addAnswer(userLoguedId, userId, response, comment);
-  res.status(201).json({
+  res.status(200).json({
     success: true,
     messaje: "Solicitud respondida exitosamente, se envió un email notificando al usuario"
   })

@@ -41,7 +41,7 @@ export const searchValidation = Joi.object({
   .valid(
     'Pasante',
     'Becario',
-    'Coordinador'
+    'Colaborador'
   )
     .messages({
       'string.base': 'El rol debe ser un texto válido.'

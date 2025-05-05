@@ -3,7 +3,7 @@ import bcrypt, { hashSync } from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { LoginDto } from '../dtos/auth.dto';
 import { appConfig } from '../../../config/app';
-import {UserStatusEnum} from '../enums/userStatus.enum';
+import { UserStatusEnum } from '../enums/userStatus.enum';
 //import { sendTemplatedEmail } from '../../notifications/services/notification.service';
 // src/modules/security/services/auth.service.ts
 import { sendEmail } from '../../notifications/services/notification.service';
@@ -27,43 +27,43 @@ export const loginUser = async (loginData: LoginDto) => {
   if (!user) {
     throw new Error('Usuario no encontrado');
   }
-  
+
   const userStatus = await user.getUserStatus()
-  if(userStatus.userStatusName == UserStatusEnum.PENDING){
+  if (userStatus.userStatusName == UserStatusEnum.PENDING) {
     throw new Error('La cuenta no ha sido confirmada. Por favor, revise su correo electrónico para confirmar su cuenta')
   }
 
 
-  if(userStatus.userStatusName == UserStatusEnum.ACTIVE){
+  if (userStatus.userStatusName == UserStatusEnum.ACTIVE) {
 
-  const userRole = await user.getRole();
+    const userRole = await user.getRole();
 
 
-  const isPasswordValid = await bcrypt.compare(password, user.userPassword);
-  if (!isPasswordValid) {
-    throw new Error('Contraseña incorrecta');
-  }
-
-  const token = jwt.sign(
-    {
-      userId: user.userId,
-      email: user.userEmail,
-      role: user.userRoleId
-    },
-    appConfig.JWT_SECRET,
-    { expiresIn: '2h' }
-  );
-
-  return {
-    token,
-    user: {
-      id: user.userId,
-      name: `${user.userFirstName} ${user.userLastName}`,
-      email: user.userEmail,
-      role: userRole.roleName
+    const isPasswordValid = await bcrypt.compare(password, user.userPassword);
+    if (!isPasswordValid) {
+      throw new Error('Contraseña incorrecta');
     }
-  }
-  }else{
+
+    const token = jwt.sign(
+      {
+        userId: user.userId,
+        email: user.userEmail,
+        role: user.userRoleId
+      },
+      appConfig.JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+
+    return {
+      token,
+      user: {
+        id: user.userId,
+        name: `${user.userFirstName} ${user.userLastName}`,
+        email: user.userEmail,
+        role: userRole.roleName
+      }
+    }
+  } else {
     throw new Error("No podés iniciar sesión por el momento")
   };
 };
@@ -75,10 +75,10 @@ export async function recoveryPassword(email: string): Promise<void> {
   const user = await User.findOne({ where: { userEmail: email } });
 
   if (!user) {
-  // throw new Error('Usuario no encontrado');
+    // throw new Error('Usuario no encontrado');
     const error = new Error("No se encontró el usuario");
-  error.name = "NotFoundError"; // para diferenciarlo en el handler
-  throw error;
+    error.name = "NotFoundError"; // para diferenciarlo en el handler
+    throw error;
   }
 
   // 🔐 Token para recuperar contraseña (ejemplo)
@@ -127,21 +127,21 @@ export async function verifyRecoveryTokenService(token: string) {
 
 
 //Cambio de contraeña
-export async function recoveryPasswordSaveService(userId: string, password: string){
-const userNewPassword = await User.findByPk(userId);
-if(!userNewPassword){
-  return { success: false, status: 404, message: 'Usuario no encontrado' };
-}
+export async function recoveryPasswordSaveService(userId: string, password: string) {
+  const userNewPassword = await User.findByPk(userId);
+  if (!userNewPassword) {
+    return { success: false, status: 404, message: 'Usuario no encontrado' };
+  }
 
-userNewPassword.userPassword = await bcrypt.hash(password, 10);
-userNewPassword.updatedDate = new Date(),
-await userNewPassword.save()
+  userNewPassword.userPassword = await bcrypt.hash(password, 10);
+  userNewPassword.updatedDate = new Date(),
+    await userNewPassword.save()
 
-return {
-  success: true,
-  status: 200,
-  message: 'Se cambió la contraseña exitosamente'
-};
+  return {
+    success: true,
+    status: 200,
+    message: 'Se cambió la contraseña exitosamente'
+  };
 
 }
 
