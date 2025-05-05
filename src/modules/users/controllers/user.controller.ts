@@ -7,6 +7,7 @@ import { boolean } from "joi";
 import { UserStatusEnum } from "../enums/userStatus.enum";
 import { RoleEnum } from "../enums/role.enum";
 import { ResponseUserEnum } from "../enums/responseUser.enum";
+import { ModifyUserInputDTO } from "../dtos/updatedUser.dto";
 
 
 
@@ -75,18 +76,19 @@ export const answerUser = catchAsync(async (req: Request, res: Response) => {
 
 
 export async function updateUser(req: Request, res: Response): Promise<void> {
-  const { token } = (req as any).user;
+  const { userLoguedId } = (req as any).user;
   const userId = req.params.id;
-  const isAccept = boolean // Asegúrate de que el ID del usuario se pase como un parámetro en la URL
   const firstName = req.body.firstName;
   const lastName = req.body.lastName;
-  const password = req.body.password;
-  const email = req.body.email;
-  const roleId = req.body.roleId;
+  const email  = req.body.email;
+  const roleId  = req.body.roleId;
+  const  personalFile = req.body.personalFile;
+  const dni = req.body.dni;
+  const phoneNumber= req.body.phoneNumber;
   try {
-    const user = await modifyUser(userId, firstName, lastName, password, email, roleId);
+    const user = await modifyUser(userLoguedId, userId, firstName, lastName, email, roleId, personalFile, dni, phoneNumber);
     if (user !== null) {
-      res.status(200).json(user);
+      res.status(200).json("Los datos se actualizaron exitosamente");
     }
     else {
       res.status(404).json({ message: "Usuario no encontrado" });

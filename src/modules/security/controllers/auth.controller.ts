@@ -1,6 +1,15 @@
 import { Request, Response } from 'express';
-import { loginUser, recoveryPassword, verifyRecoveryTokenService, recoveryPasswordSaveService, logoutService, getFunctionalitiesByRoleId} from '../services/auth.service';
+import {
+  loginUser,
+  recoveryPassword,
+  verifyRecoveryTokenService,
+  recoveryPasswordSaveService,
+  logoutService,
+  getFunctionalitiesByRoleId,
+  verifyTokenService
+} from '../services/auth.service';
 import { catchAsync } from '../../../utils/catchAsync';
+
 
 
 
@@ -19,12 +28,9 @@ export const requestPasswordReset = catchAsync(async (req: Request, res: Respons
 
   res.status(200).json({
     success: true,
-    message: 'Se le ha enviado un correo electrónico con las instrucciones para continuar el proceso de desbloqueo o cambio de contraseña. Recuerde que tiene una vigencia de 24 horas. Por favor, valide que el correo no se encuentre en la bandeja de spam.'});
+    message: 'Se le ha enviado un correo electrónico con las instrucciones para continuar el proceso de desbloqueo o cambio de contraseña. Recuerde que tiene una vigencia de 24 horas. Por favor, valide que el correo no se encuentre en la bandeja de spam.'
+  });
 });
-
-
-
-
 
 
 
@@ -36,7 +42,7 @@ export async function verifyRecoveryToken(req: Request, res: Response) {
 };
 
 
-export async function saveNewPassword(req: Request, res: Response){
+export async function saveNewPassword(req: Request, res: Response) {
   const { password, userId } = req.body;
 
   const result = await recoveryPasswordSaveService(userId, password);
@@ -71,3 +77,21 @@ export const getRoleFunctionalitiesController = async (req: Request, res: Respon
 }
 
 
+
+
+export const verifyToken = async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Token no proporcionado' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const userInfo = await verifyTokenService(token);
+    return res.status(200).json(userInfo);
+  } catch (error: any) {
+    return res.status(401).json({ message: error.message });
+  }
+};

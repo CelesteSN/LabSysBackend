@@ -3,7 +3,7 @@ import { BlackListToken } from '../modules/security/models/blackListToken.model'
 
 export const checkBlacklist = async (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ mensaje: 'Token no proporcionado' });
+  if (!token) return res.status(401).json({ mensaje: 'No cuenta con los permisos necesarios para acceder a este recurso' });
 
   const exists = await BlackListToken.findOne({ where: { token } });
   if (exists) {

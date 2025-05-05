@@ -13,7 +13,7 @@ import { UserFilter } from "../dtos/userFilters.dto";
 import { Op, where } from 'sequelize';
 import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
 import { sendEmail } from '../../notifications/services/notification.service';
-import {AllRoleDto, mapRoleToDto}  from '../dtos/allRole.dto';
+import { AllRoleDto, mapRoleToDto } from '../dtos/allRole.dto';
 import { ResponseUserEnum } from "../enums/responseUser.enum";
 
 
@@ -47,7 +47,7 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
     const normalizedRole = filters?.role?.trim();
     const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
 
-    
+
 
     if (filters?.search) {
         whereConditions[Op.or] = [
@@ -79,30 +79,30 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
             ],
             include: [
                 {
-                  model: UserStatus,
-                  attributes: ['userStatusName'],
-                  ...(isStatusAll ? {} : { where: { userStatusName: status } })
+                    model: UserStatus,
+                    attributes: ['userStatusName'],
+                    ...(isStatusAll ? {} : { where: { userStatusName: status } })
                 },
-              
-              
-                
-                    {
-                        model: Role,
-                        attributes: ['roleName'],
-                        ...(isSpecificRole
-                          ? { where: { roleName: normalizedRole } }
-                          : { where: { roleName: { [Op.not]: 'Tutor' } } } // no se especificó → excluye "Tutor"
-                          //: {} // no aplica filtro → trae todos
-                        )
-                      }
-                      
+
+
+
+                {
+                    model: Role,
+                    attributes: ['roleName'],
+                    ...(isSpecificRole
+                        ? { where: { roleName: normalizedRole } }
+                        : { where: { roleName: { [Op.not]: 'Tutor' } } } // no se especificó → excluye "Tutor"
+                        //: {} // no aplica filtro → trae todos
+                    )
+                }
+
             ]
         });
 
         return users.map(mapUserToDto);
     }
     else {
-        
+
         throw new Error("No puede acceder a esta funcionalidad");
 
 
@@ -218,10 +218,7 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
 
 
     //Obtengo el usuario al que le quiero responder la solicitud de alta
-    //const userPending = await User.findByPk(userId)
-
-
-    const userPending = await User.findByPk(userId,{
+    const userPending = await User.findByPk(userId, {
         include: [
             {
                 model: UserStatus,
@@ -277,31 +274,43 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
         userPending.save();
         const html = `
             <p>Estimado/a ${userPending.userFirstName},</p>
-            <p>Su usuario con permiso ${(await userPendingRole).roleName} ha sido fue rechazada.</p>
+            <p>Su solicitud de alta de usuario con permiso ${(await userPendingRole).roleName} ha sido rechazada.</p>
             <p>Motivo de rechazo: ${comment}</p>
                 <p>Muchas gracias.</p>
           `;
 
 
-          await sendEmail(userPending.userEmail, 'Respuesta de alta de usuario', html);
+        await sendEmail(userPending.userEmail, 'Respuesta de alta de usuario', html);
     }
 
 }
 //}
 
-export async function modifyUser(id: string, firstName: string, lastName: string, password: string, email: string, roleId: string): Promise<User | null> {
+export async function modifyUser(userLoguedId: string, id: string, firstName: string, lastName: string, email: string, roleId: string, personalFile: string, dni: string, phone_number?: string): Promise<User | null> {
 
     const user = await User.findByPk(id);
     if (!user) {
         return null; // Usuario no encontrado
     }
+    const userStatus = await user.getUserStatus();
+    if (!(userStatus.userStatusName == UserStatusEnum.ACTIVE && userLoguedId == id)) { throw new Error("No puede acceder a este recurso") }
+
 
     user.userFirstName = firstName;
     user.userLastName = lastName;
     user.userEmail = email;
+    user.userRoleId = roleId;
+    if(phone_number){
+    user.userPhoneNumber = phone_number;
+    }
+    user.userDni = dni;
+    user.userPersonalFile = personalFile;
+
+    //   if (password !== undefined && password.trim() !== '') {
+    //     user.userPassword = await bcrypt.hash(password, 10);
+    //   }
+
     user.updatedDate = new Date();
-    //user.userPassword = await bcrypt.hash(password, 10); // Hashear la nueva contraseña
-    user.userRoleId = roleId; // Asignar el nuevo rol
 
     await user.save(); // Guardar los cambios en la base de datos
 
@@ -323,9 +332,9 @@ export async function lowUser(id: string): Promise<void> {
 }
 
 
-export async function allRoleService(): Promise<AllRoleDto[]>{
+export async function allRoleService(): Promise<AllRoleDto[]> {
     const allRole = await Role.findAll();
-    if(allRole.length == 0){
+    if (allRole.length == 0) {
         throw new Error("Roles no encontrados");
     }
     return allRole.map(mapRoleToDto);

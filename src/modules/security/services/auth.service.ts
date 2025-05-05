@@ -17,6 +17,7 @@ import { where } from "sequelize";
 import RoleFunctionality from "../models/roleFunctionality.model";
 import { RoleFunctionalityDto } from "../dtos/roleFunctionality.dto";
 import FunctionalityDto from "../dtos/functionality.dto";
+const JWT_SECRET = process.env.JWT_SECRET || 'default_secret';
 
 
 
@@ -209,4 +210,29 @@ export const getFunctionalitiesByRoleId = async (): Promise<RoleFunctionalityDto
   }
 
   return result;
+};
+
+
+
+export const verifyTokenService = async (token: string) => {
+  try {
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+
+    const user = await User.findByPk(decoded.userId, {
+      attributes: ['userId', 'userFirstName', 'userLastName'],
+      include: [{ association: 'UserStatus' }]
+    });
+
+    if (!user || user.UserStatus?.userStatusName !== UserStatusEnum.ACTIVE) {
+      throw new Error('Usuario inactivo o no encontrado');
+    }
+
+    return {
+      userId: user.userId,
+      name: `${user.userFirstName} ${user.userLastName}`
+    };
+
+  } catch (error: any) {
+    throw new Error('Token inválido o expirado');
+  }
 };
