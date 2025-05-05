@@ -10,7 +10,8 @@ export type OneUserDto = {
     personalFile: string;
     status: string;
     role: string;
-    //createdDate: string
+    comment?: string
+    createdDate: string
 };
 
 export function mapOneUserToDto(user: User): OneUserDto {
@@ -23,11 +24,12 @@ export function mapOneUserToDto(user: User): OneUserDto {
         phoneNumber: user.userPhoneNumber,
         status: user.UserStatus?.userStatusName || '',
         role: user.Role?.roleName || '',
+        comment: user.userDisabledReason || '',
 
-        //   createdDate: user.createdDate.toLocaleDateString('es-AR', {
-        //     day: '2-digit',
-        //     month: '2-digit',
-        //     year: 'numeric',
-        // })
+          createdDate: user.createdDate.toLocaleDateString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        })
     };
 }

@@ -61,13 +61,13 @@ export const logout = async (req: Request, res: Response) => {
 
 
 export const getRoleFunctionalitiesController = async (req: Request, res: Response) => {
-    const profileId = req.body.profileId;
-    if (!profileId) return res.status(200).json("No se encontro el dato")
-    try {
-        res.status(200).json(getFunctionalitiesByRoleId(profileId))
-    } catch (err: any) {
-       throw new Error("Ocurrio un error");
-    }
+  try {
+    const data = await getFunctionalitiesByRoleId();
+    res.status(200).json(data);
+  } catch (error: any) {
+    console.error('Error al obtener roles y funcionalidades:', error.message);
+    res.status(500).json({ message: 'Error al obtener los datos' });
+  }
 }
 
 

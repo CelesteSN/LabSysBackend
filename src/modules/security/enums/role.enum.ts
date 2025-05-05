@@ -1,7 +1,7 @@
 export enum RoleEnum {
     TUTOR = "Responsable",
     PASANTE = "Pasante",
-    ADMIN = "Administrador",
+    COLABORATOR = "Colaborador",
     BECARIO = "Becario",
   
 }

@@ -182,28 +182,31 @@ export async function logoutService(token: string): Promise<void> {
 
 
 
-export const getFunctionalitiesByRoleId = async (roleId: string): Promise<RoleFunctionalityDto | null> => {
-  const roleFunctionalities = await RoleFunctionality.findAll({
-    where:{
-            "role_id": roleId
-          },
-          include: Functionality,
+export const getFunctionalitiesByRoleId = async (): Promise<RoleFunctionalityDto[]> => {
+  const roles = await Role.findAll({ attributes: ['roleId', 'roleName'] });
 
-  });
+  if (!roles.length) throw new Error('No se encontraron roles');
 
-  if (!roleFunctionalities.length) return null;
+  const result: RoleFunctionalityDto[] = [];
 
-  //const role = roleFunctionalities[0].Role;
-  const role = await Role.findByPk(roleId);
-  if(!role){throw new Error("Rol no válido")};
-  const functionalityDtos: FunctionalityDto[] = roleFunctionalities.map(rf => ({
-   // id: rf.Functionality.functionalityId,
-   functionalityName: rf.Functionality.functionalityName,
-  }));
+  for (const role of roles) {
+    const roleFunctionalities = await RoleFunctionality.findAll({
+      where: { roleFunctionalityRoleId: role.roleId },
+      include: [
+        {
+          model: Functionality,
+          attributes: ['functionalityName']
+        }
+      ]
+    });
 
-  return {
-   // id: role.roleId,
-    nameRole: role.roleName,
-    functionality: roleFunctionalities.map(rf => rf.Functionality.functionalityName)
-  };
+    const functionalityNames = roleFunctionalities.map(rf => rf.Functionality?.functionalityName).filter(Boolean);
+
+    result.push({
+      nameRole: role.roleName,
+      functionality: functionalityNames
+    });
+  }
+
+  return result;
 };

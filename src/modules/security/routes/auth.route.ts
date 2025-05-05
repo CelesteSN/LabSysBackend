@@ -12,7 +12,7 @@ import {resetPasswordValidation} from '../validations/resetPasswordValidation';
 
 const router = Router();
 
-router.get('/role/:id', getRoleFunctionalitiesController );
+router.get('/role', getRoleFunctionalitiesController );
 router.post('/login', validateRequest({body: loginValidation}), loginController);
 router.post('/recovery-password', validateRequest({body: recoveryPasswordValidation}), requestPasswordReset);
 router.get('/verify-recovery/:token', verifyRecoveryToken);
