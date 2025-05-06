@@ -13,11 +13,16 @@ import { sendEmail } from '../../notifications/services/notification.service';
 import { BlackListToken } from '../models/blackListToken.model';
 import { Role } from '../models/role.model';
 import { Functionality } from '../models/functionality.model';
-import { where } from "sequelize";
+import { Op, where } from "sequelize";
 import RoleFunctionality from "../models/roleFunctionality.model";
 import { RoleFunctionalityDto } from "../dtos/roleFunctionality.dto";
 import FunctionalityDto from "../dtos/functionality.dto";
+import { UserStatus } from "../models/userStatus.model";
+import {PasswordRecovery }from "../models/passwordRecovery.model";
+import { randomUUID } from "crypto";
 const JWT_SECRET = process.env.JWT_SECRET || 'default_secret';
+//const PASSWORD_TOKEN_TTL: process.env.PASSWORD_TOKEN_TTL;
+
 
 
 
@@ -65,7 +70,7 @@ export const loginUser = async (loginData: LoginDto) => {
       }
     }
   } else {
-    throw new Error("No podés iniciar sesión por el momento")
+    throw new Error("No puede iniciar sesión por el momento")
   };
 };
 
@@ -81,19 +86,38 @@ export async function recoveryPassword(email: string): Promise<void> {
     error.name = "NotFoundError"; // para diferenciarlo en el handler
     throw error;
   }
-
+const userStatus = await user.getUserStatus();
+if(!(userStatus.userStatusName == UserStatusEnum.ACTIVE)){throw new Error("Usuario no válido")};
   // 🔐 Token para recuperar contraseña (ejemplo)
   //const token = `abc123token`; // reemplazá esto con un JWT firmado o uuid
 
+  // const token = jwt.sign(
+  //   { userId: user.userId },               // payload
+  //   process.env.JWT_SECRET!,              // clave secreta desde .env
+  //   { expiresIn: '24h' }                   // duración del token
+  // );
+  
 
-  const token = jwt.sign(
-    { userId: user.userId },               // payload
-    process.env.JWT_SECRET!,              // clave secreta desde .env
-    { expiresIn: '24h' }                   // duración del token
-  );
+
+  //Creamos el nuevo token
+  let newPasswordToken = PasswordRecovery.build();
+  newPasswordToken.passwordRecoveryUserId = user.userId;
+
+  //Calculamos el tiempo de expiración como 1 días por defecto(24 hs)
+  let expDate: Date = new Date()
+  expDate.setDate(expDate.getDate() + parseInt('1'));
+  newPasswordToken.expirationDate = expDate;
+  const token = randomUUID();
+  newPasswordToken.passwordRecoveryToken = token;
+  //newPasswordToken.passwordRecoveryToken = token;
+  newPasswordToken.createdDate= new Date;
+
+
+  //logger.debug("Se guarda el nuevo token generado");
+  await newPasswordToken.save();
+  
 
   const recoveryLink = `https://tu-app.com/reset-password/${token}`;
-
   const html = `
     <p>Estimado/a ${user.userFirstName},</p>
     <p>Recibimos una solicitud para restablecer tu contraseña.</p>
@@ -112,18 +136,38 @@ export async function recoveryPassword(email: string): Promise<void> {
 
 //validación del token en el link
 export async function verifyRecoveryTokenService(token: string) {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    const tokenSaved = await PasswordRecovery.findOne({
+      where:{
+        "passwordRecoveryToken" : token,
+        "readDate" : null
+      },
+      include: [{ model: User, as: "passwordUser" }] // importante: traé el usuario asociado
+    });
 
-    const user = await User.findByPk(decoded.userId);
-    if (!user) {
-      return { success: false, status: 404, message: 'Usuario no encontrado' };
-    }
+    if(!tokenSaved){throw new Error("Token no encontrado o ya fue utilizado")};
+    if(tokenSaved.expirationDate < new Date()) {throw new Error('El token ha expirado');}
 
-    return { success: true, status: 200, message: 'Token válido', userId: user.userId };
-  } catch (error) {
-    return { success: false, status: 400, message: 'Token inválido o expirado' };
-  }
+    const userValid = await tokenSaved.getPasswordUser();
+    
+    return { success: true, status: 200, message: 'Token válido', userId: userValid.userId };
+    // {
+    //   "userId" : (await userValid).userId
+    //   "email": (await userValid).userEmail,
+    //   "tokenValido": true
+    // };
+    
+  // try {
+  //   const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+
+  //   const user = await User.findByPk(decoded.userId);
+  //   if (!user) {
+  //     return { success: false, status: 404, message: 'Usuario no encontrado' };
+  //   }
+
+  //   return { success: true, status: 200, message: 'Token válido', userId: user.userId };
+  // } catch (error) {
+  //   return { success: false, status: 400, message: 'Token inválido o expirado' };
+  // }
 }
 
 
@@ -236,3 +280,28 @@ export const verifyTokenService = async (token: string) => {
     throw new Error('Token inválido o expirado');
   }
 };
+
+
+
+// userExistsAndIsActive = async (username: string): Promise<boolean> => {
+//   let result = await User.findOne({
+//       where: {
+//           userEmail: username
+//       },
+//       include: [{
+//           model: UserStatus,
+//           where: {
+//               "userStatusName": { [Op.eq]: UserStatusEnum.ACTIVE }
+//           }
+//       }]
+//   }).then((user) => {
+//       if (!user) throw new Error(`El usuario ${username} está bloqueado o no existe`);
+//       return true;
+
+//   }).catch((err: any) => {
+//       //logger.debug(err.message);
+//       return false;
+//   });
+
+//   return result;
+// }

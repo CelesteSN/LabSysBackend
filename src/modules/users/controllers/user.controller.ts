@@ -101,8 +101,9 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
 
 export async function deleteUser(req: Request, res: Response): Promise<void> {
   const userId = req.params.id; // Asegúrate de que el ID del usuario se pase como un parámetro en la URL
+  const { userLoguedId } = (req as any).user;
   try {
-    await lowUser(userId);
+    await lowUser(userLoguedId, userId);
     res.status(200).json({ message: "Usuario eliminado" });
   } catch (error) {
     res.status(500).json({ message: "Error al eliminar el usuario" });

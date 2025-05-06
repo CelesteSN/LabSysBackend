@@ -319,13 +319,28 @@ export async function modifyUser(userLoguedId: string, id: string, firstName: st
 
 
 
-export async function lowUser(id: string): Promise<void> {
+export async function lowUser(userLoguedId: string, id: string): Promise<void> {
     try {
         const user = await User.findByPk(id);
         if (!user) {
             throw new Error("Usuario no encontrado");
         }
-        await user.destroy(); // Eliminar el usuario de la base de datos
+
+        const userStatus = await user.getUserStatus();
+        if (!(userStatus.userStatusName == UserStatusEnum.ACTIVE && userLoguedId == id)) { throw new Error("No puede acceder a este recurso") }
+
+
+        //busco el estado "Eliminado"
+        const userStatusLow = await UserStatus.findOne({
+            where:{
+                userStatusName : UserStatusEnum.DELETED
+            }
+        })
+        if(!userStatusLow){throw new Error("No se encontró el estado")};
+        user.setUserStatus(userStatusLow.userStatusId)
+        user.deletedDate = new Date(); // Eliminar el usuario de la base de datos
+        await user.save();
+        return 
     } catch (error) {
         throw new Error("Error al eliminar el usuario");
     }
