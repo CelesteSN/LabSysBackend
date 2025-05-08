@@ -34,21 +34,45 @@ export const requestPasswordReset = catchAsync(async (req: Request, res: Respons
 
 
 
-export async function verifyRecoveryToken(req: Request, res: Response) {
+export const verifyRecoveryToken = catchAsync(async (req: Request, res: Response) => {
   const { token } = req.params;
 
   const result = await verifyRecoveryTokenService(token);
-  return res.status(result.status).json(result.success ? { message: result.message, userId: result.userId } : { message: result.message });
-};
+
+  if (!result.success) {
+    return res.status(result.status || 400).json({
+      success: false,
+      message: result.message,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: result.message,
+    userId: result.user
+  });
+});
 
 
-export async function saveNewPassword(req: Request, res: Response) {
-  const { password, userId } = req.body;
 
-  const result = await recoveryPasswordSaveService(userId, password);
+export const saveNewPassword= catchAsync(async(req: Request, res: Response) =>{
+  const { password, userId, repeatPass } = req.body;
 
-  return res.status(result.status).json({ message: result.message });
-};
+  const result = await recoveryPasswordSaveService(userId, password, repeatPass);
+
+  if (!result.success) {
+    return res.status(result.status || 400).json({
+      success: false,
+      message: result.message,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: result.message,
+  });
+});
+
 
 export const logout = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.split(' ')[1];

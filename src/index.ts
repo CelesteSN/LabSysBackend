@@ -8,6 +8,7 @@ import "express-async-errors"; // MUY IMPORTANTE para capturar errores async
 import { errorHandler } from "./middlewares/errorHandler";
 import { notificationRouter } from "./modules/notifications/routes/notification.route";
 import dotenv from "dotenv";
+import {projectRouter} from "./modules/projects/routes/project.route";
 //import {connectToDatabase} from './config/database2';
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use(bodyParser.json({ limit: "5mb" }));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/projects", projectRouter);
 
 //app.use("/api/laboratories", laboratoryRouter);
 

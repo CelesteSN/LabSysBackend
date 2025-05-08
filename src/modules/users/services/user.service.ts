@@ -348,7 +348,10 @@ export async function lowUser(userLoguedId: string, id: string): Promise<void> {
 
 
 export async function allRoleService(): Promise<AllRoleDto[]> {
-    const allRole = await Role.findAll();
+    const allRole = await Role.findAll({ where: {
+        roleName: {
+          [Op.not]: 'Tutor' // excluye el rol "Tutor"
+        }}});
     if (allRole.length == 0) {
         throw new Error("Roles no encontrados");
     }
