@@ -90,15 +90,22 @@ export const logout = async (req: Request, res: Response) => {
 
 
 
-export const getRoleFunctionalitiesController = async (req: Request, res: Response) => {
-  try {
-    const data = await getFunctionalitiesByRoleId();
-    res.status(200).json(data);
-  } catch (error: any) {
-    console.error('Error al obtener roles y funcionalidades:', error.message);
-    res.status(500).json({ message: 'Error al obtener los datos' });
-  }
-}
+export const getRoleFunctionalitiesController = catchAsync(async (req: Request, res: Response) => {
+
+    const { userLoguedId } = (req as any).user;
+    const result = await getFunctionalitiesByRoleId(userLoguedId);
+    if (result.length === 0) {
+      return res.status(200).json({
+        success: true,
+        mensaje: 'No se encontraron resultados',
+      });
+    }
+  
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  });
 
 
 

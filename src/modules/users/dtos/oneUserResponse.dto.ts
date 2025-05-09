@@ -3,7 +3,8 @@ import { User } from "../models/user.model";
 
 export type OneUserDto = {
     id: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     dni: string
     email: string;
     phoneNumber?: string;
@@ -17,7 +18,9 @@ export type OneUserDto = {
 export function mapOneUserToDto(user: User): OneUserDto {
     return {
         id: user.userId,
-        name: `${user.userFirstName} ${user.userLastName}`,
+        //name: `${user.userFirstName} ${user.userLastName}`,
+        firstName: user.userFirstName,
+        lastName: user.userLastName,
         dni: user.userDni,
         email: user.userEmail,
         personalFile: user.userPersonalFile,

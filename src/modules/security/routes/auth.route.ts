@@ -17,7 +17,7 @@ import {resetPasswordValidation} from '../validations/resetPasswordValidation';
 
 const router = Router();
 
-router.get('/role', getRoleFunctionalitiesController );
+router.get('/role', authenticateToken, getRoleFunctionalitiesController );
 router.get('/validate-session', verifyToken);
 router.post('/login', validateRequest({body: loginValidation}), loginController);
 router.post('/recovery-password', validateRequest({body: recoveryPasswordValidation}), requestPasswordReset);

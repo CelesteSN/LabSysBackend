@@ -24,7 +24,52 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
             }
         });
     }
+    if(err.name === "ForbiddenAccessError"){
+        return res.status(404).json({
+            success: false,
+            error: {
+                message: err.message
+            }
+        });
+    }
 
+    if(err.name === "UserNotFoundError"){
+        return res.status(404).json({
+            success: false,
+            error: {
+                message: err.message
+            }
+        });
+    }
+
+
+    if(err.name === "StatusNotFoundError"){
+        return res.status(404).json({
+            success: false,
+            error: {
+                message: err.message
+            }
+        });
+    }
+
+    if(err.name === "UserAlreadyDeletedError"){
+        return res.status(404).json({
+            success: false,
+            error: {
+                message: err.message
+            }
+        });
+    }
+
+    if(err.name === "RoleNotFoundError"){
+        return res.status(404).json({
+            success: false,
+            error: {
+                message: err.message
+            }
+        });
+    }
+    
     // Otros errores inesperados
     return res.status(500).json({
         success: false,

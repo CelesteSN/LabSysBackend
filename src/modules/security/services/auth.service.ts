@@ -22,6 +22,7 @@ import {PasswordRecovery }from "../models/passwordRecovery.model";
 import { randomUUID } from "crypto";
 const JWT_SECRET = process.env.JWT_SECRET || 'default_secret';
 //const PASSWORD_TOKEN_TTL: process.env.PASSWORD_TOKEN_TTL;
+import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError } from '../../../errors/customUserErrors';
 
 
 
@@ -70,7 +71,7 @@ export const loginUser = async (loginData: LoginDto) => {
       }
     }
   } else {
-    throw new Error("Las credenciales ingresadas son inválidas")
+    throw new Error("Usuario no encontrado.")
   };
 };
 
@@ -82,7 +83,7 @@ export async function recoveryPassword(email: string): Promise<void> {
 
   if (!user) {
     // throw new Error('Usuario no encontrado');
-    const error = new Error("No se encontró el usuario");
+    const error = new Error("Usuario no encontrado");
     error.name = "NotFoundError"; // para diferenciarlo en el handler
     throw error;
   }
@@ -216,7 +217,16 @@ export async function logoutService(token: string): Promise<void> {
 
 
 
-export const getFunctionalitiesByRoleId = async (): Promise<RoleFunctionalityDto[]> => {
+export const getFunctionalitiesByRoleId = async (userLoguedId: string): Promise<RoleFunctionalityDto[]> => {
+
+const userValid = await User.findOne({
+  where:{
+    userId : userLoguedId
+  },
+  include:[{model: UserStatus, where:{userStatusName : UserStatusEnum.ACTIVE}}]
+});
+    
+if(!userValid){throw new UserNotFoundError()};
   const roles = await Role.findAll({ attributes: ['roleId', 'roleName'] });
 
   if (!roles.length) throw new Error('No se encontraron roles');

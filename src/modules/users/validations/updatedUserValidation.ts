@@ -82,11 +82,4 @@ export const updatedUserValidation = Joi.object({
       "string.pattern.base": "El Legajo debe contener solo letras y números.",
     }),
 
-  roleId: Joi.string()
-    .uuid()
-    .required()
-    .messages({
-      "string.guid": "El rol debe ser un UUID válido.",
-      "any.required": "Debe seleccionar un rol."
-    }),
 });

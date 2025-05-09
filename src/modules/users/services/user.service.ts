@@ -8,7 +8,7 @@ import { Role } from "../models/role.model";
 import { randomUUID } from "crypto";
 import { mapUserToDto } from "../dtos/allUsers.dto";
 import { AllUsersDto } from "../dtos/allUsers.dto";
-import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError } from '../../../errors/customUserErrors';
+import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError } from '../../../errors/customUserErrors';
 import { UserFilter } from "../dtos/userFilters.dto";
 import { Op, where } from 'sequelize';
 import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
@@ -19,56 +19,55 @@ import { ResponseUserEnum } from "../enums/responseUser.enum";
 
 
 
+
 export async function listUsers(userLoguedId: string, filters?: UserFilter): Promise<AllUsersDto[]> {
 
-    //Bloque para validar usuario existente y activo
-    const loguedUser = await User.findByPk(userLoguedId);
-    if (!loguedUser) {
-        throw new UserNotFoundError();
-    }
+    // //Bloque para validar usuario existente y activo
+    // const loguedUser = await User.findByPk(userLoguedId);
+    // if (!loguedUser) {
+    //     throw new UserNotFoundError();
+    //     //return { success: false, status: 404, message: 'Usuario no encontrado' };
+    // }
 
-    const userLoguedStatus = await loguedUser.getUserStatus();
+    // const userLoguedStatus = await loguedUser.getUserStatus();
 
-    if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
-        throw new Error("No puede accedr a esta funcionalidad")
-    }
-
-
-
-    // Construimos condiciones dinámicas
-    const whereConditions: any = {};
-
-
-    const statusRaw = filters?.status?.trim(); // elimina espacios
-    const status = statusRaw ?? UserStatusEnum.PENDING; // si no viene, usar "Pendiente"
-    const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
-
-
-    const normalizedRole = filters?.role?.trim();
-    const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
-
-
-
-    if (filters?.search) {
-        whereConditions[Op.or] = [
-            { userFirstName: { [Op.iLike]: `%${filters.search}%` } },
-            { userLastName: { [Op.iLike]: `%${filters.search}%` } }
-        ];
-    }
-
-    if (filters?.fromDate) {
-        whereConditions.createdDate = { ...whereConditions.createdDate, [Op.gte]: filters.fromDate };
-    }
-
-    if (filters?.toDate) {
-        whereConditions.createdDate = { ...whereConditions.createdDate, [Op.lte]: filters.toDate };
-    }
-
-    //Obtengo el rol del usuario logueado para verificar sI  es tutor
-    const roleUser = await loguedUser.getRole();
+    // if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
+    //     throw new Error("No puede acceder a esta funcionalidad")
+    // }
+    const userValidated = await validateActiveUser(userLoguedId);
+    //Obtengo el rol del usuario logueado para verificar si  es tutor
+    const roleUser = await userValidated.getRole();
     if (roleUser?.roleName == RoleEnum.TUTOR) {
-        //throw new Error('No autorizado para listar usuarios'); // O podés lanzar un ForbiddenError
 
+        // Construimos condiciones dinámicas
+        const whereConditions: any = {};
+
+
+        const statusRaw = filters?.status?.trim(); // elimina espacios
+        const status = statusRaw ?? UserStatusEnum.PENDING; // si no viene, usar "Pendiente"
+        const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
+
+
+        const normalizedRole = filters?.role?.trim();
+        const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
+
+
+
+        if (filters?.search) {
+            whereConditions[Op.or] = [
+                { userFirstName: { [Op.iLike]: `%${filters.search}%` } },
+                { userLastName: { [Op.iLike]: `%${filters.search}%` } }
+            ];
+        }
+
+        if (filters?.fromDate) {
+            whereConditions.createdDate = { ...whereConditions.createdDate, [Op.gte]: filters.fromDate };
+        }
+
+        if (filters?.toDate) {
+            whereConditions.createdDate = { ...whereConditions.createdDate, [Op.lte]: filters.toDate };
+        }
+        //Obtener listado de usuarios con filtros
         const users = await User.findAll({
             where: whereConditions,
             attributes: [
@@ -96,14 +95,15 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
                     )
                 }
 
-            ]
+            ],
+            order: [["createdDate", "ASC"]]
         });
 
         return users.map(mapUserToDto);
     }
     else {
 
-        throw new Error("No puede acceder a esta funcionalidad");
+        throw new ForbiddenAccessError();
 
 
     }
@@ -168,17 +168,23 @@ export async function getUser(userLoguedId: string, id: string): Promise<OneUser
 
 
     //Bloque para validar usuario existente y activo
-    const loguedUser = await User.findByPk(userLoguedId);
-    if (!loguedUser) {
-        throw new UserNotFoundError();
+    // const loguedUser = await User.findByPk(userLoguedId);
+    // if (!loguedUser) {
+    //     throw new UserNotFoundError();
+    // }
+
+    // const userLoguedStatus = await loguedUser.getUserStatus();
+
+    // if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
+    //     throw new Error("No puede accedr a esta funcionalidad")
+    // }
+    const userValidated = await validateActiveUser(userLoguedId);
+    const userValidateRole = await userValidated.getRole();
+    const allowedRoles = [RoleEnum.TUTOR, RoleEnum.BECARIO, RoleEnum.PASANTE];
+
+    if (!allowedRoles.includes(userValidateRole.roleName as RoleEnum)) {
+        throw new ForbiddenAccessError();
     }
-
-    const userLoguedStatus = await loguedUser.getUserStatus();
-
-    if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
-        throw new Error("No puede accedr a esta funcionalidad")
-    }
-
 
     //Busco el usuario para id seleccionado
     const user = await User.findByPk(id, {
@@ -201,22 +207,30 @@ export async function getUser(userLoguedId: string, id: string): Promise<OneUser
     }
 
     return mapOneUserToDto(user);
+
+
 }
+
 
 export async function addAnswer(userLoguedId: string, userId: string, response: ResponseUserEnum, comment?: string) {
     //Obtengo el usuario logueado
-    const loguedUser = await User.findByPk(userLoguedId);
-    if (!loguedUser) {
-        throw new UserNotFoundError();
-    }
+    // const loguedUser = await User.findByPk(userLoguedId);
+    // if (!loguedUser) {
+    //     throw new UserNotFoundError();
+    // }
 
-    const userLoguedStatus = await loguedUser.getUserStatus();
+    // const userLoguedStatus = await loguedUser.getUserStatus();
 
-    if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
-        throw new Error("No puede acceder a esta funcionalidad")
-    }
+    // if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
+    //     throw new Error("No puede acceder a esta funcionalidad")
+    // }
 
+    const userValidated = await validateActiveUser(userLoguedId);
+    const roleUser = await userValidated.getRole();
+    if (roleUser?.roleName != RoleEnum.TUTOR) {
+        throw new ForbiddenAccessError();
 
+    };
     //Obtengo el usuario al que le quiero responder la solicitud de alta
     const userPending = await User.findByPk(userId, {
         include: [
@@ -286,74 +300,114 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
 }
 //}
 
-export async function modifyUser(userLoguedId: string, id: string, firstName: string, lastName: string, email: string, roleId: string, personalFile: string, dni: string, phone_number?: string): Promise<User | null> {
+export async function modifyUser(userLoguedId: string, id: string, firstName: string, lastName: string, email: string, personalFile: string, dni: string, phone_number?: string): Promise<User | null> {
 
-    const user = await User.findByPk(id);
-    if (!user) {
-        return null; // Usuario no encontrado
+    // const user = await User.findByPk(id);
+    // if (!user) {
+    //     return null; // Usuario no encontrado
+    // }
+    // const userStatus = await user.getUserStatus();
+    const userValidated = await validateActiveUser(userLoguedId);
+
+    if (!(userLoguedId == id)) { throw new ForbiddenAccessError(); }
+
+
+    userValidated.userFirstName = firstName;
+    userValidated.userLastName = lastName;
+    userValidated.userEmail = email;
+    if (phone_number) {
+        userValidated.userPhoneNumber = phone_number;
     }
-    const userStatus = await user.getUserStatus();
-    if (!(userStatus.userStatusName == UserStatusEnum.ACTIVE && userLoguedId == id)) { throw new Error("No puede acceder a este recurso") }
-
-
-    user.userFirstName = firstName;
-    user.userLastName = lastName;
-    user.userEmail = email;
-    user.userRoleId = roleId;
-    if(phone_number){
-    user.userPhoneNumber = phone_number;
-    }
-    user.userDni = dni;
-    user.userPersonalFile = personalFile;
+    userValidated.userDni = dni;
+    userValidated.userPersonalFile = personalFile;
 
     //   if (password !== undefined && password.trim() !== '') {
     //     user.userPassword = await bcrypt.hash(password, 10);
     //   }
 
-    user.updatedDate = new Date();
+    userValidated.updatedDate = new Date();
 
-    await user.save(); // Guardar los cambios en la base de datos
+    await userValidated.save(); // Guardar los cambios en la base de datos
 
-    return user;
+    return userValidated;
 }
 
 
 
 export async function lowUser(userLoguedId: string, id: string): Promise<void> {
-    try {
-        const user = await User.findByPk(id);
-        if (!user) {
-            throw new Error("Usuario no encontrado");
+    // try {
+    //     const user = await User.findByPk(id);
+    //     if (!user) {
+    //         throw new Error("Usuario no encontrado");
+    //     }
+
+    //     const userStatus = await user.getUserStatus();
+    //     if (!(userStatus.userStatusName == UserStatusEnum.ACTIVE && userLoguedId == id)) { throw new Error("No puede acceder a este recurso") }
+
+    const userValidated = await validateActiveUser(userLoguedId);
+    const userValidatedRole = await userValidated.getRole();
+    if (!(userLoguedId == id || userValidatedRole.roleName == RoleEnum.TUTOR)) { throw new ForbiddenAccessError(); }
+    //busco el estado "Eliminado"
+    const userStatusLow = await UserStatus.findOne({
+        where: {
+            userStatusName: UserStatusEnum.DELETED,
+
         }
+    })
+    if (!userStatusLow) { throw new StatusNotFoundError(); };
 
-        const userStatus = await user.getUserStatus();
-        if (!(userStatus.userStatusName == UserStatusEnum.ACTIVE && userLoguedId == id)) { throw new Error("No puede acceder a este recurso") }
-
-
-        //busco el estado "Eliminado"
-        const userStatusLow = await UserStatus.findOne({
-            where:{
-                userStatusName : UserStatusEnum.DELETED
+    const userLow = await User.findOne({
+        where: {
+            userId: id
+        },
+        include: [
+            {
+                model: UserStatus,
+                where: {
+                    userStatusName: {
+                        [Op.ne]: UserStatusEnum.DELETED
+                    }
+                }
             }
-        })
-        if(!userStatusLow){throw new Error("No se encontró el estado")};
-        user.setUserStatus(userStatusLow.userStatusId)
-        user.deletedDate = new Date(); // Eliminar el usuario de la base de datos
-        await user.save();
-        return 
-    } catch (error) {
-        throw new Error("Error al eliminar el usuario");
+        ]
+
     }
+    );
+    if (!userLow) { throw new UserAlreadyDeletedError(); };
+
+    userLow.setUserStatus(userStatusLow.userStatusId)
+    userLow.deletedDate = new Date(); // Eliminar el usuario de la base de datos
+    await userLow.save();
+    return
+
 }
 
 
 export async function allRoleService(): Promise<AllRoleDto[]> {
-    const allRole = await Role.findAll({ where: {
-        roleName: {
-          [Op.not]: 'Tutor' // excluye el rol "Tutor"
-        }}});
+    const allRole = await Role.findAll({
+        where: {
+            roleName: {
+                [Op.not]: 'Tutor' // excluye el rol "Tutor"
+            }
+        }
+    });
     if (allRole.length == 0) {
         throw new Error("Roles no encontrados");
     }
     return allRole.map(mapRoleToDto);
+}
+
+
+
+export async function validateActiveUser(userId: string): Promise<User> {
+    const user = await User.findByPk(userId);
+    if (!user) throw new UserNotFoundError();
+
+    const userStatus = await user.getUserStatus();
+    if (userStatus.userStatusName !== "Activo") {
+        // throw Errors.forbiddenAccessError("El usuario no está activo");
+        throw new ForbiddenAccessError();
+    }
+
+    return user;
 }

@@ -75,40 +75,33 @@ export const answerUser = catchAsync(async (req: Request, res: Response) => {
 })
 
 
-export async function updateUser(req: Request, res: Response): Promise<void> {
+export const updateUser = catchAsync(async(req: Request, res: Response)=> {
   const { userLoguedId } = (req as any).user;
   const userId = req.params.id;
   const firstName = req.body.firstName;
   const lastName = req.body.lastName;
   const email  = req.body.email;
-  const roleId  = req.body.roleId;
   const  personalFile = req.body.personalFile;
   const dni = req.body.dni;
   const phoneNumber= req.body.phoneNumber;
-  try {
-    const user = await modifyUser(userLoguedId, userId, firstName, lastName, email, roleId, personalFile, dni, phoneNumber);
-    if (user !== null) {
-      res.status(200).json("Los datos se actualizaron exitosamente");
-    }
-    else {
-      res.status(404).json({ message: "Usuario no encontrado" });
-    }
-  } catch (error) {
-    res.status(500).json({ message: "Error al actualizar el usuario" });
-  }
-}
+  
+    const user = await modifyUser(userLoguedId, userId, firstName, lastName, email, personalFile, dni, phoneNumber);
+    res.status(200).json({
+      success: true,
+      messaje: "Los datos se actualizaron exitosamente"
+    })
 
+  });
 
-export async function deleteUser(req: Request, res: Response): Promise<void> {
+export const deleteUser = catchAsync(async(req: Request, res: Response)=> {
   const userId = req.params.id; // Asegúrate de que el ID del usuario se pase como un parámetro en la URL
   const { userLoguedId } = (req as any).user;
-  try {
-    await lowUser(userLoguedId, userId);
-    res.status(200).json({ message: "Usuario eliminado" });
-  } catch (error) {
-    res.status(500).json({ message: "Error al eliminar el usuario" });
-  }
-}
+  await lowUser(userLoguedId, userId);
+  res.status(200).json({
+    success: true,
+    messaje: "La cuenta fue dada de baja exitosamente"
+  })
+})
 
 export const showAllRole = catchAsync(async(req: Request, res: Response)=>{
   const roles = await allRoleService();
