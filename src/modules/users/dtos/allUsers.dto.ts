@@ -7,7 +7,7 @@ export type AllUsersDto = {
     //email: string;
     status: string;
     role: string;
-    createdDate: string
+    createdDate: string;
   };
   
   export function mapUserToDto(user: User): AllUsersDto {
@@ -23,6 +23,7 @@ export type AllUsersDto = {
         year: 'numeric',
     })
     };
+    
   }
   
 

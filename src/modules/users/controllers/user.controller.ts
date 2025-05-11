@@ -13,28 +13,35 @@ import { ModifyUserInputDTO } from "../dtos/updatedUser.dto";
 
 export const getAllUsers = catchAsync(async (req: Request, res: Response) => {
   const { userLoguedId } = (req as any).user;
+
+  const pageNumber = parseInt(req.query.pageNumber as string) || 0;
+
   const filters: UserFilter = {
+    pageNumber,
     search: req.query.search as string,
     fromDate: req.query.fromDate ? new Date(req.query.fromDate as string) : undefined,
     toDate: req.query.toDate ? new Date(req.query.toDate as string) : undefined,
     status: req.query.status as UserStatusEnum || undefined,
     role: req.query.role as RoleEnum || undefined,
-
   };
 
   const users: AllUsersDto[] = await listUsers(userLoguedId, filters);
+
   if (users.length === 0) {
     return res.status(200).json({
       success: true,
+      pageNumber,
       mensaje: 'No se encontraron resultados',
     });
   }
 
   return res.status(200).json({
     success: true,
-    data: users
+    pageNumber,
+    data: users,
   });
-})
+});
+
 
 
 

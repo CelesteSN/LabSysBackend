@@ -37,7 +37,7 @@ export const loginUser = async (loginData: LoginDto) => {
 
   const userStatus = await user.getUserStatus()
   if (userStatus.userStatusName == UserStatusEnum.PENDING) {
-    throw new Error('La cuenta no ha sido confirmada. Por favor, revise su correo electrónico para confirmar su cuenta')
+    throw new Error("La cuenta no ha sido confirmada. Recuerde que para acceder a la plataforma, su solicitud deberá ser aprobada. Se le notificará por correo electrónico cuando su solicitud sea aprobada o rechazada.")
   }
 
 
@@ -161,6 +161,10 @@ export async function verifyRecoveryTokenService(token: string) {
 
 //Cambio de contraeña
 export async function recoveryPasswordSaveService(userId: string, password: string, repeatPass: string) {
+  
+  //Verificar de este activo!!!!!!!!!!!!!!
+  
+  
   const userNewPassword = await User.findByPk(userId);
   if (!userNewPassword) {
     return { success: false, status: 404, message: 'Usuario no encontrado' };

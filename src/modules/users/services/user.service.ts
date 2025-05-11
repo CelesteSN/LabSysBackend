@@ -15,12 +15,35 @@ import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
 import { sendEmail } from '../../notifications/services/notification.service';
 import { AllRoleDto, mapRoleToDto } from '../dtos/allRole.dto';
 import { ResponseUserEnum } from "../enums/responseUser.enum";
+import { appConfig } from "../../../config/app";
 
 
 
 
+/**
+ * Obtiene una lista paginada de usuarios visibles para un usuario logueado con rol de Tutor,
+ * aplicando filtros opcionales de búsqueda, fechas, estado y rol.
+ * 
+ * Proceso detallado:
+ * - Valida que el usuario logueado exista y esté activo.
+ * - Verifica que el rol del usuario logueado sea "Tutor".
+ * - Construye condiciones dinámicas según los filtros:
+ *    - `search`: búsqueda por nombre o apellido (insensible a mayúsculas/minúsculas).
+ *    - `fromDate` / `toDate`: filtra usuarios por fecha de creación.
+ *    - `status`: filtra por estado del usuario (por defecto, "Pendiente").
+ *    - `role`: filtra por rol (si no se especifica, excluye el rol "Tutor").
+ * - Ejecuta una consulta con paginación y orden por fecha de creación ascendente.
+ * - Retorna la lista mapeada a DTOs (`AllUsersDto[]`).
+ * 
+ * @param userLoguedId - ID del usuario que realiza la consulta.
+ * @param page - Número de página para la paginación.
+ * @param filters - Filtros opcionales para búsqueda, fechas, estado y rol.
+ * @throws UserNotFoundError si el usuario no existe o no está activo.
+ * @throws ForbiddenAccessError si el usuario logueado no tiene rol "Tutor".
+ * @returns Lista de usuarios como DTOs.
+ */
 
-export async function listUsers(userLoguedId: string, filters?: UserFilter): Promise<AllUsersDto[]> {
+export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
 
     // //Bloque para validar usuario existente y activo
     // const loguedUser = await User.findByPk(userLoguedId);
@@ -82,9 +105,6 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
                     attributes: ['userStatusName'],
                     ...(isStatusAll ? {} : { where: { userStatusName: status } })
                 },
-
-
-
                 {
                     model: Role,
                     attributes: ['roleName'],
@@ -94,9 +114,10 @@ export async function listUsers(userLoguedId: string, filters?: UserFilter): Pro
                         //: {} // no aplica filtro → trae todos
                     )
                 }
-
             ],
-            order: [["createdDate", "ASC"]]
+            order: [["createdDate", "ASC"]],
+            limit: parseInt(appConfig.ROWS_PER_PAGE),
+            offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
         });
 
         return users.map(mapUserToDto);
@@ -398,6 +419,7 @@ export async function allRoleService(): Promise<AllRoleDto[]> {
 }
 
 
+//Función para validar si existe el usuario y si esta en estado activo
 
 export async function validateActiveUser(userId: string): Promise<User> {
     const user = await User.findByPk(userId);

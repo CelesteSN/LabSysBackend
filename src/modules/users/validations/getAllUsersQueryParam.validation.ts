@@ -41,11 +41,16 @@ export const searchValidation = Joi.object({
   .valid(
     'Pasante',
     'Becario',
-    'Colaborador'
   )
     .messages({
       'string.base': 'El rol debe ser un texto válido.'
-    })
-
+    }),
+ pageNumber: Joi.number()
+    .min(0)
+    .optional()
+    .messages({
+        'number.base': `El valor de 'pageNumber' debe ser numérico.`,
+        'number.min': `El valor de 'pageNumber' debe ser mayor a cero.`,
+    }),
 
 });

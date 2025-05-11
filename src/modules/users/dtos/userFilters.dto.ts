@@ -5,6 +5,7 @@ export interface UserFilter {
     fromDate?: Date;             // Fecha de solicitud desde
     toDate?: Date;   // Fecha de solicitud hasta
     status?: UserStatusEnum;
-    role?: RoleEnum;        
+    role?: RoleEnum;  
+    pageNumber: number; 
 }
 
