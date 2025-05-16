@@ -28,7 +28,7 @@ export const requestPasswordReset = catchAsync(async (req: Request, res: Respons
 
   res.status(200).json({
     success: true,
-    message: 'Se le ha enviado un correo electrónico con las instrucciones para continuar el proceso de cambio de contraseña. Recuerde que tiene una vigencia de 24 horas. Por favor, valide que el correo no se encuentre en la bandeja de spam.'
+    message: 'Se le ha enviado un correo electrónico con las instrucciones para continuar el proceso de cambio de contraseña. Recuerde que tiene una vigencia de 24 horas. Por favor, verifique que el correo no se encuentre en la bandeja de spam.'
   });
 });
 

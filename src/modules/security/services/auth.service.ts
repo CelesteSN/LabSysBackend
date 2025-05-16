@@ -22,7 +22,7 @@ import {PasswordRecovery }from "../models/passwordRecovery.model";
 import { randomUUID } from "crypto";
 const JWT_SECRET = process.env.JWT_SECRET || 'default_secret';
 //const PASSWORD_TOKEN_TTL: process.env.PASSWORD_TOKEN_TTL;
-import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError } from '../../../errors/customUserErrors';
+import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, UserPendingError } from '../../../errors/customUserErrors';
 
 
 
@@ -88,6 +88,7 @@ export async function recoveryPassword(email: string): Promise<void> {
     throw error;
   }
 const userStatus = await user.getUserStatus();
+if(userStatus.userStatusName == UserStatusEnum.PENDING){throw new UserPendingError()};
 if(!(userStatus.userStatusName == UserStatusEnum.ACTIVE)){throw new Error("Usuario no válido")};
   // 🔐 Token para recuperar contraseña (ejemplo)
   //const token = `abc123token`; // reemplazá esto con un JWT firmado o uuid
@@ -146,9 +147,9 @@ export async function verifyRecoveryTokenService(token: string) {
     });
 
     if(!tokenSaved)
-      {return { success: false, message: "Token no encontrado o ya fue utilizado", status: 404 };}
+      {return { success: false, message: "El Token no fue encontrado o ya fue utilizado", status: 404 };}
     if(tokenSaved.expirationDate < new Date())
-      return { success: false, message: "El enlace al que está intentando acceder ha expirado. Por favor, solicite un nuevo enlace sirequiere modificar su contraseña/desbloquear su usuario.", status: 410 }; // 410 Gone
+      return { success: false, message: "El enlace al que está intentando acceder ha expirado. Por favor, solicite un nuevo enlace si requiere modificar su contraseña.", status: 410 }; // 410 Gone
 
 
     const userValid = await tokenSaved.getPasswordUser();

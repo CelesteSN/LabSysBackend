@@ -43,93 +43,169 @@ import { appConfig } from "../../../config/app";
  * @returns Lista de usuarios como DTOs.
  */
 
+// export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
+
+//     // //Bloque para validar usuario existente y activo
+    
+//     const userValidated = await validateActiveUser(userLoguedId);
+//     //Obtengo el rol del usuario logueado para verificar si  es tutor
+//     const roleUser = await userValidated.getRole();
+//     if (roleUser?.roleName == RoleEnum.TUTOR) {
+
+//         // Construimos condiciones dinámicas
+//         const whereConditions: any = {};
+
+
+//         const statusRaw = filters?.status?.trim(); // elimina espacios
+//         const status = statusRaw ?? UserStatusEnum.PENDING; // si no viene, usar "Pendiente"
+//         const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
+
+
+//         const normalizedRole = filters?.role?.trim();
+//         const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
+
+
+
+//         if (filters?.search) {
+//             whereConditions[Op.or] = [
+//                 { userFirstName: { [Op.iLike]: `%${filters.search}%` } },
+//                 { userLastName: { [Op.iLike]: `%${filters.search}%` } }
+//             ];
+//         }
+
+//         if (filters?.fromDate) {
+//             whereConditions.createdDate = { ...whereConditions.createdDate, [Op.gte]: filters.fromDate };
+//         }
+
+//         if (filters?.toDate) {
+//             whereConditions.createdDate = { ...whereConditions.createdDate, [Op.lte]: filters.toDate };
+//         }
+//         //Obtener listado de usuarios con filtros
+//         const users = await User.findAll({
+//             where: whereConditions,
+//             attributes: [
+//                 'userId',
+//                 'userFirstName',
+//                 'userLastName',
+//                 'createdDate'
+//             ],
+//             include: [
+//                 {
+//                     model: UserStatus,
+//                     attributes: ['userStatusName'],
+//                     ...(isStatusAll ? {} : { where: { userStatusName: status } })
+//                 },
+//                 {
+//                     model: Role,
+//                     attributes: ['roleName'],
+//                     ...(isSpecificRole
+//                         ? { where: { roleName: normalizedRole } }
+//                         : { where: { roleName: { [Op.not]: 'Tutor' } } } // no se especificó → excluye "Tutor"
+//                         //: {} // no aplica filtro → trae todos
+//                     )
+//                 }
+//             ],
+//             order: [["createdDate", "ASC"]],
+//             limit: parseInt(appConfig.ROWS_PER_PAGE),
+//             offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
+//         });
+
+//         return users.map(mapUserToDto);
+//     }
+//     else {
+
+//         throw new ForbiddenAccessError();
+
+
+//     }
+
+// }
+
+
+
+
+
+
+
+
+
+
 export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
+  // Validar usuario activo
+  const userValidated = await validateActiveUser(userLoguedId);
+  const roleUser = await userValidated.getRole();
 
-    // //Bloque para validar usuario existente y activo
-    // const loguedUser = await User.findByPk(userLoguedId);
-    // if (!loguedUser) {
-    //     throw new UserNotFoundError();
-    //     //return { success: false, status: 404, message: 'Usuario no encontrado' };
-    // }
+  if (roleUser?.roleName !== RoleEnum.TUTOR) {
+    throw new ForbiddenAccessError();
+  }
 
-    // const userLoguedStatus = await loguedUser.getUserStatus();
+  // Construcción dinámica del where
+  const whereConditions: any = {};
 
-    // if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
-    //     throw new Error("No puede acceder a esta funcionalidad")
-    // }
-    const userValidated = await validateActiveUser(userLoguedId);
-    //Obtengo el rol del usuario logueado para verificar si  es tutor
-    const roleUser = await userValidated.getRole();
-    if (roleUser?.roleName == RoleEnum.TUTOR) {
+  // Search siempre independiente
+  if (filters?.search?.trim()) {
+    const search = filters.search.trim();
+    whereConditions[Op.or] = [
+      { userFirstName: { [Op.iLike]: `%${search}%` } },
+      { userLastName: { [Op.iLike]: `%${search}%` } }
+    ];
+  }
 
-        // Construimos condiciones dinámicas
-        const whereConditions: any = {};
+  // Rango de fechas opcional
+  if (filters?.fromDate) {
+    whereConditions.createdDate = {
+      ...whereConditions.createdDate,
+      [Op.gte]: filters.fromDate,
+    };
+  }
 
+  if (filters?.toDate) {
+    whereConditions.createdDate = {
+      ...whereConditions.createdDate,
+      [Op.lte]: filters.toDate,
+    };
+  }
 
-        const statusRaw = filters?.status?.trim(); // elimina espacios
-        const status = statusRaw ?? UserStatusEnum.PENDING; // si no viene, usar "Pendiente"
-        const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
+  // Procesar filtros de status y rol
+  const statusRaw = filters?.status?.trim();
+  const status = statusRaw ?? UserStatusEnum.PENDING;
+  const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
 
+  const normalizedRole = filters?.role?.trim();
+  const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== "todos";
 
-        const normalizedRole = filters?.role?.trim();
-        const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
-
-
-
-        if (filters?.search) {
-            whereConditions[Op.or] = [
-                { userFirstName: { [Op.iLike]: `%${filters.search}%` } },
-                { userLastName: { [Op.iLike]: `%${filters.search}%` } }
-            ];
-        }
-
-        if (filters?.fromDate) {
-            whereConditions.createdDate = { ...whereConditions.createdDate, [Op.gte]: filters.fromDate };
-        }
-
-        if (filters?.toDate) {
-            whereConditions.createdDate = { ...whereConditions.createdDate, [Op.lte]: filters.toDate };
-        }
-        //Obtener listado de usuarios con filtros
-        const users = await User.findAll({
-            where: whereConditions,
-            attributes: [
-                'userId',
-                'userFirstName',
-                'userLastName',
-                'createdDate'
-            ],
-            include: [
-                {
-                    model: UserStatus,
-                    attributes: ['userStatusName'],
-                    ...(isStatusAll ? {} : { where: { userStatusName: status } })
-                },
-                {
-                    model: Role,
-                    attributes: ['roleName'],
-                    ...(isSpecificRole
-                        ? { where: { roleName: normalizedRole } }
-                        : { where: { roleName: { [Op.not]: 'Tutor' } } } // no se especificó → excluye "Tutor"
-                        //: {} // no aplica filtro → trae todos
-                    )
-                }
-            ],
-            order: [["createdDate", "ASC"]],
-            limit: parseInt(appConfig.ROWS_PER_PAGE),
-            offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-        });
-
-        return users.map(mapUserToDto);
+  const includeOptions = [
+    {
+      model: UserStatus,
+      attributes: ["userStatusName"],
+      ...(isStatusAll ? {} : { where: { userStatusName: status } })
+    },
+    {
+      model: Role,
+      attributes: ["roleName"],
+      ...(isSpecificRole
+        ? { where: { roleName: normalizedRole } }
+        : { where: { roleName: { [Op.not]: RoleEnum.TUTOR } } })
     }
-    else {
+  ];
 
-        throw new ForbiddenAccessError();
+  const users = await User.findAll({
+    where: whereConditions,
+    attributes: ["userId", "userFirstName", "userLastName", "createdDate"],
+    include: includeOptions,
+    order: [["createdDate", "ASC"]],
+    limit: parseInt(appConfig.ROWS_PER_PAGE),
+    offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
+  });
 
-
-    }
-
+  return users.map(mapUserToDto);
 }
+
+
+
+
+
+
 
 
 
@@ -397,7 +473,7 @@ export async function lowUser(userLoguedId: string, id: string): Promise<void> {
     if (!userLow) { throw new UserAlreadyDeletedError(); };
 
     userLow.setUserStatus(userStatusLow.userStatusId)
-    userLow.deletedDate = new Date(); // Eliminar el usuario de la base de datos
+    userLow.deletedDate = new Date(); 
     await userLow.save();
     return
 

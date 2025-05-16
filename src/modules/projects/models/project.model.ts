@@ -16,8 +16,11 @@ import {
     declare projectName: string;
     declare projectDescription?: string | null;
     declare projectObjetive?: string| null;
-    declare projectStartDate?: string| null;
-    declare projectEndDate?: string | null;
+    declare projectStartDate?: Date| null;
+    declare projectEndDate?: Date | null;
+   // declare projectEndDate: Date;
+    //declare projectStartDate: Date;
+
     declare createdDate: Date;
     declare updatedDate: Date;
     declare deletedDate?: Date | null;

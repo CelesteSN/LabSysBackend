@@ -1,6 +1,7 @@
 export enum ProjectStatusEnum {
     ACTIVE= "Activo",
-    INPROGRESS = "en progreso",
+    INPROGRESS = "En progreso",
     FINISHED = "Finalizado",
-    BLOCKED = "Bloqueado"
+    LOW = "Dado de baja",
+    ALL = "Todos"
 }
