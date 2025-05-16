@@ -73,6 +73,10 @@ ProjectUser.belongsTo(User,{
     foreignKey: "projectUserUserId"
 });
 
+
+User.hasMany(ProjectUser, { foreignKey: 'projectUserUserId' });
+
+
 export default ProjectUser;
 
 

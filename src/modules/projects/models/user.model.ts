@@ -132,3 +132,7 @@ import {
     foreignKey: 'user_role_id',
   });
   
+
+
+
+// User.belongsTo(Role, { foreignKey: 'userRoleId' });

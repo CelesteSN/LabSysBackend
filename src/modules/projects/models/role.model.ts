@@ -1,5 +1,7 @@
-import { DataTypes, Model, UUIDV4} from "sequelize";
+import { DataTypes, Model, UUIDV4, } from "sequelize";
 import { sequelize } from '../../../config/database';
+import { User } from "./user.model";
+
 
 export class Role extends Model{
 declare roleId: string;
@@ -46,4 +48,5 @@ Role.init(
         timestamps: false,
       }
     );
+
 

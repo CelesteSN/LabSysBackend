@@ -15,6 +15,8 @@ import { AllProjectsDto, mapProjectToDto } from "../dtos/allProjects.dto";
 import { appConfig } from "../../../config/app";
 import { mapOneProjectToDto, OneProjectDto } from "../dtos/oneProjectResponse.dto";
 import ProjectUser from "../models/projectUser.model";
+import { mapToProjectMembersDto } from "../dtos/listMembers.dto";
+import { Role } from "../models/role.model";
 
 export async function listProjects(userLoguedId: string, filters: ProjectFilter): Promise<AllProjectsDto[]> {
   //llamar a la funcion para validar al usuario Activo
@@ -233,6 +235,54 @@ export async function lowproject(userLoguedId: string , projectId: string) {
 
 }
 
+
+export async function listMembers(userLoguedId: string, projectId: string){
+const userValidated = await validateActiveUser(userLoguedId);
+
+
+ const userRole = await userValidated.getRole();
+
+  // Si no es tutor, verificar que esté asociado al proyecto
+  if (userRole.roleName !== RoleEnum.TUTOR) {
+    const isMember = await ProjectUser.findOne({
+      where: {
+        projectUserProjectId: projectId,
+        projectUserUserId: userLoguedId
+      }
+    });
+
+    if (!isMember) {
+      throw new ForbiddenAccessError("No tiene permiso para ver los miembros de este proyecto.");
+    }
+  }
+
+
+const members = await ProjectUser.findAll({
+  where: {
+    "projectUserProjectId": projectId ,
+  },
+
+      include: [
+        {
+          model: Project,
+          attributes: ['projectId','projectName'] 
+        },
+        {
+          model: User,
+          attributes: ['userFirstName', 'userLastName', 'userPersonalFile', 'userEmail'],
+          include: [{model: Role,
+            attributes: ['roleName'],
+            required: true
+          }]
+  
+        }
+      ]
+    });
+  //console.log(JSON.stringify(members, null, 2)); // Verificá si aparece Role aquí
+    const result = mapToProjectMembersDto(members);
+    return result
+  
+};
 
 
 
