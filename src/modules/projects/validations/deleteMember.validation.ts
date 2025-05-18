@@ -7,6 +7,7 @@ export const deleteMemberSchema = Joi.object({
     .messages({
       'any.required': 'El campo userId es obligatorio.',
       'string.base': 'userId debe ser una cadena.',
-      'string.uuid': 'userId debe ser un UUID válido.'
+      'string.uuid': 'userId debe ser un UUID válido.',
+      'string.empty': 'Debe seleccionar a al menos un usuario.',
     })
 });

@@ -30,7 +30,7 @@ projectRouter.put('/stage/:stageId',authenticateToken,checkBlacklist, updateStag
 projectRouter.delete('/stage/:stageId',authenticateToken,checkBlacklist,  deleteStageToProject);
 
 
-// 🔹 Operaciones sobre miembros de un proyecto
+// // 🔹 Operaciones sobre miembros de un proyecto
 
 projectRouter.get('/:projectId/members',authenticateToken,checkBlacklist,  getMembers);
 projectRouter.post('/:projectId/members',authenticateToken,checkBlacklist,validateRequest({body: addMembersSchema}),  addMemberToProject);

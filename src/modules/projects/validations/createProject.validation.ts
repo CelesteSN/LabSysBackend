@@ -24,7 +24,8 @@ export const projectValidationSchema = Joi.object({
     .required()
     .messages({
       'string.pattern.base': 'La fecha debe estar en formato dd-MM-aaaa.',
-      'any.required': 'La fecha de inicio del proyecto es obligatoria.'
+      'any.required': 'La fecha de inicio del proyecto es obligatoria.',
+      'string.empty': 'El campo fecha de inicio no puede estar vacío.',
     }),
 
 endDate: Joi.string()
@@ -32,6 +33,7 @@ endDate: Joi.string()
     .required()
   .messages({
     'string.pattern.base': 'La fecha debe estar en formato dd-MM-aaaa.',
+    'string.empty': 'El campo fecha de finalización no puede estar vacío.',
      "date.greater": "La fecha de finalización debe ser posterior a la fecha de inicio.",
       "any.required": "La fecha de finalización es obligatoria.",
   })

@@ -34,19 +34,22 @@ export const updateProjectSchema = Joi.object({
       "string.max": "El objetivo no puede tener más de 255 caracteres.",
     }),
 
-//   fechaInicio: Joi.date()
-//     .required()
-//     .messages({
-//       "date.base": "La fecha de inicio debe ser una fecha válida.",
-//       "any.required": "La fecha de inicio es obligatoria.",
-//     }),
+  startDate: Joi.string()
+    .pattern(/^\d{2}-\d{2}-\d{4}$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'La fecha debe estar en formato dd-MM-aaaa.',
+      'string.empty': 'El campo fecha de inicio no puede estar vacío.',
+      'any.required': 'La fecha de inicio del proyecto es obligatoria.'
+    }),
 
-//   fechaFin: Joi.date()
-//     .greater(Joi.ref("fechaInicio"))
-//     .required()
-//     .messages({
-//       "date.base": "La fecha de finalización debe ser una fecha válida.",
-//       "date.greater": "La fecha de finalización debe ser posterior a la fecha de inicio.",
-//       "any.required": "La fecha de finalización es obligatoria.",
-//     }),
+  endDate: Joi.string()
+    .pattern(/^\d{2}-\d{2}-\d{4}$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'La fecha debe estar en formato dd-MM-aaaa.',
+      "date.greater": "La fecha de finalización debe ser posterior a la fecha de inicio.",
+      'string.empty': 'El campo fecha de finalizacíon no puede estar vacío.',
+      "any.required": "La fecha de finalización es obligatoria.",
+    })
 });

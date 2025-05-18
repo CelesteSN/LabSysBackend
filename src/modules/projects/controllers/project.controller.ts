@@ -72,9 +72,11 @@ export const updateProject = catchAsync(async (req: Request, res: Response) => {
   const projectName = req.body.projectName;
   const description = req.body.description;
   const objetive = req.body.objetive;
+  const startDate = req.body.startDate;
+  const endDate = req.body.endDate;
 
 
-  const user = await modifyProject(userLoguedId, projectId, projectName, description, objetive);
+  const user = await modifyProject(userLoguedId, projectId, projectName, description, objetive, startDate, endDate );
   res.status(200).json({
     success: true,
     message: "El proyecto ha sido modificado exitosamente"

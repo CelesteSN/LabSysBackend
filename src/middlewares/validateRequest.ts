@@ -30,10 +30,10 @@ export function validateRequest(schemas: ValidationSchemas) {
                 if (error) {
                     const errores = error.details.map(d => ({
                         campo: d.path.join('.'),
-                        mensaje: d.message,
+                        message: d.message,
                     }));
                     return res.status(400).json({
-                        mensaje: `Error de validación en ${key}`,
+                        message: `Error de validación en ${key}`,
                         errores,
                     });
                 }

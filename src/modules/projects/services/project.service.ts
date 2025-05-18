@@ -165,7 +165,7 @@ export async function getProject(userLoguedId: string, id: string): Promise<OneP
 
 
 
-export async function modifyProject(userLoguedId: string, projectId: string, name: string, description: string, objetive: string): Promise<Project | null> {
+export async function modifyProject(userLoguedId: string, projectId: string, name: string, description: string, objetive: string, startDate: string, endDate:string ): Promise<Project | null> {
 
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
@@ -183,7 +183,7 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
   const projectExists = await Project.findOne({
     where: {
       projectName: name,
-      projectId: { [Op.ne]: projectId } // excluye la etapa actual
+      projectId: { [Op.ne]: projectId } 
     },
   });
   if (projectExists) { throw new NameUsedError() };
@@ -210,7 +210,8 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
   updatedProject.projectDescription = description;
   updatedProject.projectObjetive = objetive;
   updatedProject.updatedDate = new Date();
-
+  updatedProject.projectStartDate =  parse(startDate, 'dd-MM-yyyy', new Date()),
+  updatedProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
 
   await updatedProject.save(); // Guardar los cambios en la base de datos
 
