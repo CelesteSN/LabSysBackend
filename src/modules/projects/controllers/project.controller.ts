@@ -44,7 +44,7 @@ export async function createProject(req: Request, res: Response): Promise<void> 
   const projectTypeId = req.body.projectTypeId;
   const startDate = req.body.startDate;
   const endDate = req.body.endDate;
-  const newProject = await saveNewProject(userLoguedId, projectName, projectTypeId, startDate,endDate );
+  const newProject = await saveNewProject(userLoguedId, projectName, projectTypeId, startDate, endDate);
   res.status(201).json({
     success: true,
     message: "El proyecto ha sido creado exitosamente."
@@ -95,17 +95,17 @@ export const deleteProject = catchAsync(async (req: Request, res: Response) => {
 
 export const getMembers = catchAsync(async (req: Request, res: Response) => {
   const { userLoguedId } = (req as any).user;
-  const  projectId  = req.params.projectId;
+  const projectId = req.params.projectId;
   const members = await listMembers(userLoguedId, projectId);
-  
 
-if (!members.members || members.members.length === 0) {
-  return res.status(200).json({
-    success: true,
-    message: "No se encontraron resultados",
-    data: members,
-  });
-}
+
+  if (!members.members || members.members.length === 0) {
+    return res.status(200).json({
+      success: true,
+      message: "No se encontraron resultados",
+      data: members,
+    });
+  }
   return res.status(200).json({
     success: true,
     //pageNumber,
@@ -114,44 +114,44 @@ if (!members.members || members.members.length === 0) {
 })
 
 
-export const addMemberToProject = catchAsync(async(req: Request, res: Response)=>{
- const { userLoguedId } = (req as any).user;
-  const  projectId  = req.params.projectId;
-const userIds: string[] = req.body.userIds;
+export const addMemberToProject = catchAsync(async (req: Request, res: Response) => {
+  const { userLoguedId } = (req as any).user;
+  const projectId = req.params.projectId;
+  const userIds: string[] = req.body.userIds;
   await addMenmbers(userLoguedId, projectId, userIds);
- res.status(201).json({
+  res.status(201).json({
     success: true,
     message: "Usuario/s asignado/s al proyecto exitosamente, se le/s ha enviado un email notificandolo/s."
   });
 
 })
 
-export const deleteMemberToProject = catchAsync(async(req: Request, res: Response)=>{
- const { userLoguedId } = (req as any).user;
-  const  projectId  = req.params.projectId;
+export const deleteMemberToProject = catchAsync(async (req: Request, res: Response) => {
+  const { userLoguedId } = (req as any).user;
+  const projectId = req.params.projectId;
   const userId = req.body.userId;
   await lowMember(userLoguedId, projectId, userId);
- res.status(201).json({
+  res.status(201).json({
     success: true,
     message: "El usuario ha sido desvinculado del proyecto exitosamente."
   });
 })
 
 
-export const getAllStages = catchAsync(async(req :Request, res: Response)=>{
+export const getAllStages = catchAsync(async (req: Request, res: Response) => {
 
   const { userLoguedId } = (req as any).user;
-  const  projectId  = req.params.projectId;
-   const pageNumber = parseInt(req.query.pageNumber as string) || 0;
+  const projectId = req.params.projectId;
+  const pageNumber = parseInt(req.query.pageNumber as string) || 0;
   const stageList = await listStages(userLoguedId, projectId, pageNumber);
 
-   if (stageList.stages.length === 0) {
-  return res.status(200).json({
-    success: true,
-    pageNumber,
-    message: 'No se encontraron etapas asociadas al proyecto.',
-  });
-}
+  if (stageList.stages.length === 0) {
+    return res.status(200).json({
+      success: true,
+      pageNumber,
+      message: 'No se encontraron etapas asociadas al proyecto.',
+    });
+  }
 
   return res.status(200).json({
     success: true,
@@ -164,7 +164,7 @@ export const getAllStages = catchAsync(async(req :Request, res: Response)=>{
 export async function createStage(req: Request, res: Response): Promise<void> {
 
   const { userLoguedId } = (req as any).user;
-  const  projectId  = req.params.projectId;
+  const projectId = req.params.projectId;
   const stageName = req.body.stageName;
   const stageOrder = req.body.stageOrder;
   const newProject = await addNewStage(userLoguedId, projectId, stageName, stageOrder);
@@ -192,26 +192,26 @@ export const updateStage = catchAsync(async (req: Request, res: Response) => {
 });
 
 
-export const deleteStageToProject = catchAsync(async(req: Request, res: Response)=>{
- const { userLoguedId } = (req as any).user;
-  const  stageId  = req.params.stageId;
+export const deleteStageToProject = catchAsync(async (req: Request, res: Response) => {
+  const { userLoguedId } = (req as any).user;
+  const stageId = req.params.stageId;
   await lowStage(userLoguedId, stageId);
- res.status(201).json({
+  res.status(201).json({
     success: true,
     message: "La etapa ha sido eliminada exitosamente."
   });
 })
 
-export const getAllProjectType = catchAsync(async(req: Request, res: Response)=>{
-   const { userLoguedId } = (req as any).user;
-   const projectTypeList = await listProjectType(userLoguedId);
+export const getAllProjectType = catchAsync(async (req: Request, res: Response) => {
+  const { userLoguedId } = (req as any).user;
+  const projectTypeList = await listProjectType(userLoguedId);
   if (projectTypeList.length === 0) {
-  return res.status(200).json({
-    success: true,
-   // pageNumber,
-    message: 'No se encontraron tipos de proyecto.',
-  });
-}
+    return res.status(200).json({
+      success: true,
+      // pageNumber,
+      message: 'No se encontraron tipos de proyecto.',
+    });
+  }
 
   return res.status(200).json({
     success: true,

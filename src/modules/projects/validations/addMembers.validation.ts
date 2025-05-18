@@ -6,9 +6,9 @@ export const addMembersSchema = Joi.object({
     .min(1)
     .required()
     .messages({
-      'any.required': 'Se requiere el campo userIds.',
+      'any.required': 'El campo userIds es obligatorio.',
       'array.base': 'userIds debe ser un arreglo.',
-      'array.min': 'Debe proporcionar al menos un userId.',
+      'array.min': 'Debe seleccionar al menos un userId.',
       'string.uuid': 'Cada userId debe ser un UUID válido.'
     })
 });

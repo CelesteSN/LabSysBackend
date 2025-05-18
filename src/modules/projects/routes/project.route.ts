@@ -6,7 +6,8 @@ import { projectValidationSchema } from '../validations/createProject.validation
 import { checkBlacklist } from '../../../middlewares/checkBlacList.middleware';
 import { searchValidation } from '../validations/getAllProjectsQueryParam.validation';
 import { updateProjectSchema } from "../validations/updateProject.validation";
-import {addMembersSchema} from "../validations/addMembers.validation"
+import {addMembersSchema} from "../validations/addMembers.validation";
+import {deleteMemberSchema} from "../validations/deleteMember.validation";
 
 
 
@@ -33,7 +34,7 @@ projectRouter.delete('/stage/:stageId',authenticateToken,checkBlacklist,  delete
 
 projectRouter.get('/:projectId/members',authenticateToken,checkBlacklist,  getMembers);
 projectRouter.post('/:projectId/members',authenticateToken,checkBlacklist,validateRequest({body: addMembersSchema}),  addMemberToProject);
-projectRouter.delete('/:projectId/members',authenticateToken,checkBlacklist,  deleteMemberToProject);
+projectRouter.delete('/:projectId/members',authenticateToken,checkBlacklist, validateRequest({body: deleteMemberSchema}), deleteMemberToProject);
 
 
 // 🔸 Operaciones generales de proyecto
