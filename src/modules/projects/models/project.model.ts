@@ -10,14 +10,18 @@ import {
   import { sequelize } from '../../../config/database';
   import { ProjectStatus } from "./projectStatus.model";
   import { ProjectType } from "./projectType.model";
+    import ProjectUser from "./projectUser.model"; // asegurate de importar correctamente
+
   
   export class Project extends Model {
     declare projectId: string;
     declare projectName: string;
     declare projectDescription?: string | null;
     declare projectObjetive?: string| null;
-    declare projectStartDate?: Date| null;
-    declare projectEndDate?: Date | null;
+    declare projectStartDate: Date;
+    declare projectEndDate: Date;
+    declare projectUsers?: ProjectUser[]; // si querés accederlos en TypeScript
+
    // declare projectEndDate: Date;
     //declare projectStartDate: Date;
 
@@ -67,13 +71,13 @@ import {
     },
     projectStartDate: {
       field: "project_start_date",
-      type: DataTypes.STRING,
-      allowNull: true
+      type: DataTypes.DATE,
+      allowNull: false
     },
     projectEndDate: {
       field: "project_end_date",
-      type: DataTypes.STRING,
-      allowNull: true
+      type: DataTypes.DATE,
+      allowNull: false
     },
    
     createdDate: {
@@ -118,3 +122,10 @@ import {
     foreignKey: 'project_type_id',
   });
   
+
+
+
+Project.hasMany(ProjectUser, {
+  foreignKey: 'projectUserProjectId', // este es el campo FK en ProjectUser que apunta a Project
+  as: 'projectUsers' // alias que vas a usar en los includes
+});

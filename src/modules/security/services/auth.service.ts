@@ -7,7 +7,6 @@ import { UserStatusEnum } from '../enums/userStatus.enum';
 //import { sendTemplatedEmail } from '../../notifications/services/notification.service';
 // src/modules/security/services/auth.service.ts
 import { sendEmail } from '../../notifications/services/notification.service';
-
 // import { generateRecoveryToken } from './auth.utils'; // si usás JWT
 // src/modules/security/services/auth.service.ts
 import { BlackListToken } from '../models/blackListToken.model';

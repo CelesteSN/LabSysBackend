@@ -48,7 +48,11 @@ export class NotFoundResultsError extends BaseError {
         super("No se encontraron resultados", 404);
     }
 }
-
+export class OrderExistsError extends BaseError {
+    constructor(){
+        super("El orden ya esta en uso", 404);
+    }
+}
 
 export class UserPendingError extends BaseError {
     constructor(){
