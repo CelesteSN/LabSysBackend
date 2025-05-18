@@ -21,70 +21,10 @@ import { StageStatus } from "../models/stageStatus.model";
 import { ProjectStagesDto, mapToProjectStagesDto } from "../dtos/allStages.dto";
 import { StageStatusEnum } from "../enums/stageStatus.enum";
 import { mapProjectToDetailsDto } from "../dtos/listMembers.dto";
-
-// export async function listProjects(userLoguedId: string, filters: ProjectFilter): Promise<AllProjectsDto[]> {
-//   //llamar a la funcion para validar al usuario Activo
-//   const userValidated = await validateActiveUser(userLoguedId);
-//   const userRole = await userValidated.getRole();
-
-//   // Construimos condiciones dinámicas
-//   const whereConditions: any = {};
+import { parse } from 'date-fns';
 
 
-//   const statusRaw = filters?.status?.trim(); // elimina espacios
-//   const status = statusRaw ?? ProjectStatusEnum.INPROGRESS; // si no viene, usar "Pendiente"
-//   const isStatusAll = status.toLowerCase() === ProjectStatusEnum.ALL.toLowerCase();
 
-
-//   if (filters?.search) {
-//     whereConditions[Op.or] = [
-//       { projetName: { [Op.iLike]: `%${filters.search}%` } },
-//     ];
-//   }
-//   if(userRole.roleName == RoleEnum.TUTOR){
-//   const listProjects = await Project.findAll(
-//     {
-//       where: whereConditions,
-//       attributes: ['projectId', 'projectName', 'projectStartDate', 'projectEndDate'],
-//       include: [
-//         {
-//           model: ProjectStatus,
-//           attributes: ['projectStatusName'],
-//           ...(isStatusAll ? {} : { where: { "projectStatusName": status } })
-//         },
-//       ],
-//       order: [["createdDate", "ASC"]],
-//       limit: parseInt(appConfig.ROWS_PER_PAGE),
-//       offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-//     });
-//   }else{
-//   if(userRole.roleName == RoleEnum.BECARIO || userRole.roleName == RoleEnum.PASANTE){
-//   const listProjects = await Project.findAll(
-//     {
-//       where: whereConditions,
-//       attributes: ['projectId', 'projectName', 'projectStartDate', 'projectEndDate'],
-//       include: [{
-//         model: ProjectUser,
-//         where:{
-//           projectUserUserId: userValidated.userId
-//         }
-//       },
-//         {
-//           model: ProjectStatus,
-//           attributes: ['projectStatusName'],
-//           ...(isStatusAll ? {} : { where: { "projectStatusName": status } })
-//         },
-//       ],
-//       order: [["createdDate", "ASC"]],
-//       limit: parseInt(appConfig.ROWS_PER_PAGE),
-//       offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-//     });
-//   }
-// }
-//   // if(listProjects.length == 0){throw new NotFoundResultsError()};
-//   return listProjects.map(mapProjectToDto);
-
-// }
 
 export async function listProjects(userLoguedId: string, filters: ProjectFilter): Promise<AllProjectsDto[]> {
   const userValidated = await validateActiveUser(userLoguedId);
@@ -176,8 +116,8 @@ export async function saveNewProject(userLoguedId: string, projectName: string, 
   //creo el proyecto
   const newProject = await Project.build();
   newProject.projectName = projectName,
-  newProject.projectStartDate = new Date(startDate),
-    newProject.projectEndDate = new Date (endDate),
+  newProject.projectStartDate = parse(startDate, 'dd-MM-yyyy', new Date()),
+    newProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
     newProject.createdDate = new Date(),
     newProject.updatedDate = new Date(),
     newProject.projectStatusId = status.projectStatusId
