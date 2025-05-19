@@ -6,12 +6,12 @@ import { format } from 'date-fns';
 
 export type ProjectDetailsDto = {
   id: string;
-  projectName: string;
-  description?: string | '';
-  objetive?: string |'';
-  startDate: string;
-  endDate: string;
-  status: string; // Nombre del estado del proyecto
+  // projectName: string;
+  // description?: string | '';
+  // objetive?: string |'';
+  // startDate: string;
+  // endDate: string;
+  // status: string; // Nombre del estado del proyecto
   members: ProjectMemberDto[]; // Lista de miembros
 };
 
@@ -28,12 +28,12 @@ export type ProjectMemberDto = {
 export function mapProjectToDetailsDto(project: Project): ProjectDetailsDto {
   return {
     id: project.projectId,
-    projectName: project.projectName,
-    description: project.projectDescription || '',
-    objetive: project.projectObjetive || '',
-    startDate: formatDate(project.projectStartDate),
-    endDate:formatDate(project.projectEndDate) ,
-    status: project.ProjectStatus.projectStatusName,
+    // projectName: project.projectName,
+    // description: project.projectDescription || '',
+    // objetive: project.projectObjetive || '',
+    // startDate: formatDate(project.projectStartDate),
+    // endDate:formatDate(project.projectEndDate) ,
+    // status: project.ProjectStatus.projectStatusName,
     members: (project.projectUsers ?? []).map(pu => ({
       userId: pu.User.userId,
       userFirstName: pu.User.userFirstName,
