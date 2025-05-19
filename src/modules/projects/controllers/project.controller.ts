@@ -3,7 +3,7 @@ import { AllProjectsDto } from "../dtos/allProjects.dto";
 import { ProjectFilter } from "../dtos/projectFilters.dto";
 import { ProjectStatusEnum } from "../enums/projectStatus.enum";
 import { ProjectType } from "../models/projectType.model";
-import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType } from "../services/project.service";
+import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType, getAvailableUsersForProject } from "../services/project.service";
 import { Request, Response } from "express";
 
 
@@ -223,3 +223,8 @@ export const getAllProjectType = catchAsync(async (req: Request, res: Response) 
 })
 
 
+export const getAllUsersProject = catchAsync(async(req: Request, res: Response)=>{
+  const { userLoguedId } = (req as any).user;
+   const projectId = req.params.projectId;
+   const usersList = await getAvailableUsersForProject(userLoguedId , projectId)
+})

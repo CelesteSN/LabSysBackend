@@ -22,6 +22,8 @@ import { ProjectStagesDto, mapToProjectStagesDto } from "../dtos/allStages.dto";
 import { StageStatusEnum } from "../enums/stageStatus.enum";
 import { mapProjectToDetailsDto } from "../dtos/listMembers.dto";
 import { parse } from 'date-fns';
+import { UserStatus } from "../models/userStatus.model";
+import { UserStatusEnum } from "../../users/enums/userStatus.enum";
 
 
 
@@ -116,7 +118,7 @@ export async function saveNewProject(userLoguedId: string, projectName: string, 
   //creo el proyecto
   const newProject = await Project.build();
   newProject.projectName = projectName,
-  newProject.projectStartDate = parse(startDate, 'dd-MM-yyyy', new Date()),
+    newProject.projectStartDate = parse(startDate, 'dd-MM-yyyy', new Date()),
     newProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
     newProject.createdDate = new Date(),
     newProject.updatedDate = new Date(),
@@ -165,7 +167,7 @@ export async function getProject(userLoguedId: string, id: string): Promise<OneP
 
 
 
-export async function modifyProject(userLoguedId: string, projectId: string, name: string, description: string, objetive: string, startDate: string, endDate:string ): Promise<Project | null> {
+export async function modifyProject(userLoguedId: string, projectId: string, name: string, description: string, objetive: string, startDate: string, endDate: string): Promise<Project | null> {
 
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
@@ -183,7 +185,7 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
   const projectExists = await Project.findOne({
     where: {
       projectName: name,
-      projectId: { [Op.ne]: projectId } 
+      projectId: { [Op.ne]: projectId }
     },
   });
   if (projectExists) { throw new NameUsedError() };
@@ -210,10 +212,10 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
   updatedProject.projectDescription = description;
   updatedProject.projectObjetive = objetive;
   updatedProject.updatedDate = new Date();
-  updatedProject.projectStartDate =  parse(startDate, 'dd-MM-yyyy', new Date()),
-  updatedProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
+  updatedProject.projectStartDate = parse(startDate, 'dd-MM-yyyy', new Date()),
+    updatedProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
 
-  await updatedProject.save(); // Guardar los cambios en la base de datos
+    await updatedProject.save(); // Guardar los cambios en la base de datos
 
   return updatedProject;
 }
@@ -279,39 +281,39 @@ export async function listMembers(userLoguedId: string, projectId: string) {
 
 
   const project = await Project.findOne({
-  where: {
-    projectId: projectId,
-  },
-  include: [
-    {
-      model: ProjectStatus,
-      attributes: ['projectStatusName'],
-      required: true
+    where: {
+      projectId: projectId,
     },
-    {
-      model: ProjectUser,
-      as: 'projectUsers', // alias que usaste en Project.hasMany(ProjectUser)
-      include: [
-        {
-          model: User,
-          attributes: ['userFirstName', 'userLastName', 'userPersonalFile', 'userEmail'],
-          include: [
-            {
-              model: Role,
-              attributes: ['roleName'],
-              required: true
-            }
-          ]
-        }
-      ]
-    }
-  ],
-  order: [[{ model: ProjectUser, as: 'projectUsers' }, User, 'userFirstName', 'ASC']],
+    include: [
+      {
+        model: ProjectStatus,
+        attributes: ['projectStatusName'],
+        required: true
+      },
+      {
+        model: ProjectUser,
+        as: 'projectUsers', // alias que usaste en Project.hasMany(ProjectUser)
+        include: [
+          {
+            model: User,
+            attributes: ['userId', 'userFirstName', 'userLastName', 'userPersonalFile', 'userEmail'],
+            include: [
+              {
+                model: Role,
+                attributes: ['roleName'],
+                required: true
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    order: [[{ model: ProjectUser, as: 'projectUsers' }, User, 'userFirstName', 'ASC']],
 
-});
+  });
 
 
-if (!project) {
+  if (!project) {
     throw new NotFoundResultsError();
   }
 
@@ -406,15 +408,46 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
     throw new NotFoundResultsError();
   }
 
+
   // Validar que los usuarios existan y estén activos
-  const validatedUsers = await Promise.all(
-    userIds.map(async (userId) => await validateActiveUser(userId))
-  );
+  //   for (const userId of userIds) {
+  //   const user = await User.findByPk(userId, {
+  //     include: [{ model: UserStatus }]
+  //   });
+
+  //   if (!user) {
+  //     throw new ForbiddenAccessError(`El usuario con ID "${userId}" no existe.`);
+  //   }
+
+  //   if (user.UserStatus.userStatusName !== UserStatusEnum.ACTIVE) {
+  //     const fullName = `${user.userFirstName} ${user.userLastName}`;
+  //     throw new ForbiddenAccessError(`El usuario "${fullName}" no está activo.`);
+  //   }
+  // }
+
+
+  //   //Validar si pertenecen al proyecto 
+  // for (const userId of userIds) {
+  //   const existingMembership = await ProjectUser.findOne({
+  //     where: {
+  //       projectUserProjectId: projectId,
+  //       projectUserUserId: userId
+  //     },
+  //     include: [{ model: User }] // asegurate que la asociación esté definida así
+  //   });
+
+  //   if (existingMembership) {
+  //     const userFirstName = existingMembership.User?.userFirstName || 'El usuario';
+  //     const userLastName = existingMembership.User?.userLastName || 'El usuario';
+  //     throw new ForbiddenAccessError(`El usuario "${userFirstName} ${userLastName}" ya se encuentra asignado al proyecto, corrija su selección para continuar.`);
+  //   }
+
+  // }
 
   // Crear asociaciones
-  const projectUsersToCreate = validatedUsers.map(user => ({
+  const projectUsersToCreate = userIds.map(userId => ({
     projectUserProjectId: project.projectId,
-    projectUserUserId: user.userId,
+    projectUserUserId: userId,
     createdDate: new Date(),
     updatedDate: new Date()
   }));
@@ -789,4 +822,43 @@ export async function listProjectType(userLoguedId: string) {
   const userValidated = await validateActiveUser(userLoguedId);
   const projectType = await ProjectType.findAll();
   return projectType
+}
+
+
+
+
+
+
+
+export async function getAvailableUsersForProject(userloguedId: string , projectId: string): Promise<User[]> {
+  // Obtener IDs de usuarios ya asignados al proyecto
+  const assignedUsers = await ProjectUser.findAll({
+    where: { projectUserProjectId: projectId },
+    attributes: ['projectUserUserId']
+  });
+
+  const assignedUserIds = assignedUsers.map(pu => pu.projectUserUserId);
+
+  // Buscar usuarios activos con rol "BECARIO" o "PASANTE" que no estén asignados al proyecto
+  const availableUsers = await User.findAll({
+    where: {
+      userId: { [Op.notIn]: assignedUserIds }
+    },
+    include: [
+      {
+        model: Role,
+        where: {
+          roleName: { [Op.in]: ['Becario', 'Pasante'] }
+        }
+      },
+      {
+        model: UserStatus,
+        where: {
+          userStatusName: 'Activo'
+        }
+      }
+    ]
+  });
+
+  return availableUsers;
 }
