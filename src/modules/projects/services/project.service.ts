@@ -133,17 +133,18 @@ export async function saveNewProject(userLoguedId: string, projectName: string, 
 
 
 
-export async function getProject(userLoguedId: string, id: string): Promise<OneProjectDto> {
+export async function getProject(userLoguedId: string, projedId: string): Promise<OneProjectDto> {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
 
 
-  if (!(userValidated.userId === id || userRole.roleName === RoleEnum.TUTOR)) {
+  if (!(await validateProjectMembershipWhitReturn(userValidated.userId, projedId) || userRole.roleName === RoleEnum.TUTOR)) {
     throw new ForbiddenAccessError()
   }
+
   //Busco el usuario para id seleccionado
-  const project = await Project.findByPk(id, {
+  const project = await Project.findByPk(projedId, {
 
     include: [
       {
@@ -166,6 +167,18 @@ export async function getProject(userLoguedId: string, id: string): Promise<OneP
 
 }
 
+
+
+export async function validateProjectMembershipWhitReturn(userId: string, projectId: string): Promise<boolean> {
+  const membership = await ProjectUser.findOne({
+    where: {
+      projectUserUserId: userId,
+      projectUserProjectId: projectId
+    }
+  });
+
+  return !!membership; // retorna true si existe, false si no
+}
 
 
 export async function modifyProject(userLoguedId: string, projectId: string, name: string, description: string, objetive: string, startDate: string, endDate: string): Promise<Project | null> {
@@ -831,8 +844,8 @@ export async function listProjectType(userLoguedId: string) {
 
 
 
-export async function getAvailableUsersForProject(userLoguedId: string , projectId: string, pageNumber: number): Promise<AllUsersDto[]> {
- 
+export async function getAvailableUsersForProject(userLoguedId: string, projectId: string, pageNumber: number): Promise<AllUsersDto[]> {
+
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
@@ -867,7 +880,7 @@ export async function getAvailableUsersForProject(userLoguedId: string , project
         }
       }
     ],
-     order: [["userFirstName", "ASC"]],
+    order: [["userFirstName", "ASC"]],
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * pageNumber,
   });
