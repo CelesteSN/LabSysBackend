@@ -121,11 +121,17 @@ export const addMemberToProject = catchAsync(async (req: Request, res: Response)
   const projectId = req.params.projectId;
   const userIds: string[] = req.body.userIds;
   await addMenmbers(userLoguedId, projectId, userIds);
-  res.status(201).json({
+  if(userIds.length == 1){
+res.status(201).json({
     success: true,
-    message: "Usuario/s asignado/s al proyecto exitosamente, se le/s ha enviado un email notificandolo/s."
+    message: "Usuario asignado al proyecto exitosamente, se le ha enviado un email notificandolo."
   });
-
+  }else{
+    res.status(201).json({
+    success: true,
+    message: "Usuarios asignados al proyecto exitosamente, se les ha enviado un email notificandolos."
+  });
+  }
 })
 
 export const deleteMemberToProject = catchAsync(async (req: Request, res: Response) => {
@@ -147,11 +153,12 @@ export const getAllStages = catchAsync(async (req: Request, res: Response) => {
   const pageNumber = parseInt(req.query.pageNumber as string) || 0;
   const stageList = await listStages(userLoguedId, projectId, pageNumber);
 
-  if (stageList.stages.length === 0) {
+  if (stageList.length === 0) {
     return res.status(200).json({
       success: true,
       pageNumber,
       message: 'No se encontraron etapas asociadas al proyecto.',
+      data: []
     });
   }
 
@@ -169,6 +176,7 @@ export async function createStage(req: Request, res: Response): Promise<void> {
   const projectId = req.params.projectId;
   const stageName = req.body.stageName;
   const stageOrder = req.body.stageOrder;
+  
   const newProject = await addNewStage(userLoguedId, projectId, stageName, stageOrder);
   res.status(201).json({
     success: true,
@@ -182,10 +190,10 @@ export const updateStage = catchAsync(async (req: Request, res: Response) => {
   const stagetId = req.params.stageId;
   const stageName = req.body.stageName;
   const stageOrder = req.body.stageOrder;
-  const stageStatus = req.body.stageStatus;
+  
 
 
-  const user = await modifyStage(userLoguedId, stagetId, stageName, stageOrder, stageStatus);
+  const user = await modifyStage(userLoguedId, stagetId, stageName, stageOrder);
   res.status(200).json({
     success: true,
     messaje: "La etapa ha sido modificada exitosamente"

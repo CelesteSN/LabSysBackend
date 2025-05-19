@@ -61,13 +61,13 @@ Stage.init(
       field: "stage_start_date",
       type: DataTypes.DATE,
       allowNull: true,
-      defaultValue: 0
+     
     },
     stageEndDate: {
       field: "stage_end_date",
       type: DataTypes.DATE,
       allowNull: true,
-      defaultValue: 0
+     
     },
     stageProjectId: {
       field: "stage_project_id",

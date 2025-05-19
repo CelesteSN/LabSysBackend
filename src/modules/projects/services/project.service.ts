@@ -18,13 +18,15 @@ import ProjectUser from "../models/projectUser.model";
 import { Role } from "../models/role.model";
 import Stage from "../models/stage.model";
 import { StageStatus } from "../models/stageStatus.model";
-import { ProjectStagesDto, mapToProjectStagesDto } from "../dtos/allStages.dto";
+import { AllStagesDto, mapStageToDto } from "../dtos/allStages.dto";
 import { StageStatusEnum } from "../enums/stageStatus.enum";
 import { mapProjectToDetailsDto } from "../dtos/listMembers.dto";
 import { parse } from 'date-fns';
 import { UserStatus } from "../models/userStatus.model";
 import { UserStatusEnum } from "../../users/enums/userStatus.enum";
 import { AllUsersDto, mapUserToDto } from "../dtos/userList.dto";
+import { sendEmail } from '../../notifications/services/notification.service';
+
 
 
 
@@ -212,7 +214,7 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
         model: ProjectStatus,
         where: {
           projectStatusName: {
-            [Op.or]: ["En progreso", "Activo"]
+            [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
         },
       },
@@ -411,7 +413,7 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
         model: ProjectStatus,
         where: {
           projectStatusName: {
-            [Op.or]: ["En progreso", "Activo"]
+            [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
         },
       },
@@ -469,10 +471,31 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
   // Guardar en DB
   await ProjectUser.bulkCreate(projectUsersToCreate);
 
-  //MANDAR EMAIL
+//  // Enviar emails a los usuarios
+  for (const userId of userIds) {
+
+  const user = await User.findByPk(userId);
+if (!user) {
+      throw new ForbiddenAccessError(`El usuario con ID "${userId}" no existe.`);
+    }  const html = `
+      <p>Estimado/a ${user.userFirstName} ${user.userLastName},</p>
+      <p>Le informamos que ha sido asignado al proyecto <strong>${project.projectName}</strong>.</p>
+      <p>Para visualizar los detalles del proyecto, ingrese al sistema a través del siguiente botón: “Iniciar sesión”.</p>
+      <p>Saludos.</p>
+    `;
+
+    try {
+      await sendEmail(user.userEmail, 'Asignación a proyecto', html);
+    } catch (err) {
+      console.error(`Error al enviar email a ${user.userEmail}:`, err);
+      // Podés registrar el error pero continuar con el resto
+    }
+  }
 
   return;
 }
+
+
 
 
 export async function lowMember(userLoguedId: string, projectId: string, userId: string) {
@@ -498,7 +521,7 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
         model: ProjectStatus,
         where: {
           projectStatusName: {
-            [Op.or]: ["En progreso", "Activo"]
+            [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
         },
       },
@@ -525,7 +548,7 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
 
 
 
-export async function listStages(userLoguedId: string, projectId: string, pageNumber: number): Promise<ProjectStagesDto> {
+export async function listStages(userLoguedId: string, projectId: string, pageNumber: number): Promise<AllStagesDto[]> {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
@@ -540,7 +563,7 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
         model: ProjectStatus,
         where: {
           projectStatusName: {
-            [Op.or]: ["En progreso", "Activo"]
+            [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
         },
       },
@@ -558,17 +581,17 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
         model: StageStatus,
         attributes: ["stageStatusName"]
       },
-      {
-        model: Project,
-        attributes: ["projectId", "projectName", "projectDescription", "projectObjetive", "projectStartDate", "projectEndDate"],
-        include: [
-          {
-            model: ProjectStatus,
-            attributes: ['projectStatusName'],
-            required: true
-          }
-        ]
-      }
+      // {
+      //   model: Project,
+      //   attributes: ["projectId", "projectName", "projectDescription", "projectObjetive", "projectStartDate", "projectEndDate"],
+      //   include: [
+      //     {
+      //       model: ProjectStatus,
+      //       attributes: ['projectStatusName'],
+      //       required: true
+      //     }
+      //   ]
+      // }
     ],
 
 
@@ -577,9 +600,10 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
     offset: parseInt(appConfig.ROWS_PER_PAGE) * pageNumber,
   });
   if (stageList.length === 0) {
-    return mapToProjectStagesDto([]); // Devuelve el DTO vacío con datos del proyecto si querés
+    return []// Devuelve el DTO vacío con datos del proyecto si querés
   }
-  return mapToProjectStagesDto(stageList);
+  return stageList.map(mapStageToDto);
+
 }
 
 
@@ -601,7 +625,7 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
         model: ProjectStatus,
         where: {
           projectStatusName: {
-            [Op.or]: ["En progreso", "Activo"]
+            [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
         },
       },
@@ -616,7 +640,8 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
   //Valido que el nombre ingresado no exista
   const stageExists = await Stage.findOne({
     where: {
-      "stageName": stageName
+      "stageName": stageName,
+      "stageProjectId": projectId
     },
   });
   if (stageExists) { throw new NameUsedError() };
@@ -624,7 +649,8 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
   //valido el orden
   const orderExist = await Stage.findOne({
     where: {
-      "stageOrder": stageOrder
+      "stageOrder": stageOrder,
+      "stageProjectId": projectId
     }
   })
   if (orderExist) { throw new OrderExistsError() };
@@ -663,7 +689,7 @@ export async function validateActiveUser(userId: string): Promise<User> {
   if (!user) throw new UserNotFoundError();
 
   const userStatus = await user.getUserStatus();
-  if (userStatus.userStatusName !== "Activo") {
+  if (userStatus.userStatusName !== UserStatusEnum.ACTIVE) {
     // throw Errors.forbiddenAccessError("El usuario no está activo");
     throw new ForbiddenAccessError();
   }
@@ -689,14 +715,7 @@ export async function validateProjectMembership(userId: string, projectId: strin
 
 
 
-
-
-
-
-
-
-
-export async function modifyStage(userLoguedId: string, stageId: string, stageName: string, stageOrder: number, status: string): Promise<Stage | null> {
+export async function modifyStage(userLoguedId: string, stageId: string, stageName: string, stageOrder: number): Promise<Stage | null> {
 
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
@@ -708,13 +727,13 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
   //Obtener el proyecto a partir de la etapa
   //Valido el proyecto ingresado
   const stageUpdated = await Stage.findOne({
-    where: { stageId },
+    where: { "stageId": stageId },
     include: [
       {
         model: StageStatus,
         where: {
           stageStatusName: {
-            [Op.or]: ["En progreso", "Pendiente"]
+            [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
           }
         },
       },
@@ -730,12 +749,10 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
   await validateProjectMembership(userLoguedId, pro.projectId);
 
 
-
-
   //Valido que el nombre ingresado no exista
   const stageNameExists = await Stage.findOne({
     where: {
-      stagetName: stageName,
+      stageName: stageName,
       stageProjectId: pro.projectId,
       stageId: { [Op.ne]: stageId } // excluye la etapa actual
     },
@@ -754,17 +771,9 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
   })
   if (orderExist) { throw new OrderExistsError() };
 
-  //busco el esta ingresado
-  const sendingStatus = await StageStatus.findOne({
-    where: { "stageStatusName": status }
-  })
-
-
-
 
   stageUpdated.stageName = stageName;
   stageUpdated.stageOrder = stageOrder;
-  stageUpdated.setStageStatus(sendingStatus?.stageStatusId)
   stageUpdated.updatedDate = new Date();
 
 
@@ -790,8 +799,8 @@ export async function lowStage(userLoguedId: string, stageId: string) {
       {
         model: StageStatus,
         where: {
-          stagetStatusName: {
-            [Op.or]: ["En progreso", "Activo"]
+          stageStatusName: {
+            [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
           }
         },
       },
@@ -810,7 +819,7 @@ export async function lowStage(userLoguedId: string, stageId: string) {
   //Validar que este asignado al proyecto
   await validateProjectMembership(userLoguedId, projectStage.projectId);
 
-  deletedStage.destroy;
+  deletedStage.destroy();
   //ELIMINAR TODAS LAS TAREAS ASOCIADAS
   // //Buscar el estado Dado de baja
   // const statusLow = await ProjectStatus.findOne({
@@ -826,7 +835,7 @@ export async function lowStage(userLoguedId: string, stageId: string) {
   // deletedproject.setProjectStatus(statusLow.projectStatusId)
   // deletedproject.deletedDate = new Date(); // Eliminar el usuario de la base de datos
   // await deletedproject.save();
-  // return
+   return
 
 }
 
@@ -837,11 +846,6 @@ export async function listProjectType(userLoguedId: string) {
   const projectType = await ProjectType.findAll();
   return projectType
 }
-
-
-
-
-
 
 
 export async function getAvailableUsersForProject(userLoguedId: string, projectId: string, pageNumber: number): Promise<AllUsersDto[]> {
@@ -870,13 +874,13 @@ export async function getAvailableUsersForProject(userLoguedId: string, projectI
       {
         model: Role,
         where: {
-          roleName: { [Op.in]: ['Becario', 'Pasante'] }
+          roleName: { [Op.in]: [RoleEnum.BECARIO, RoleEnum.PASANTE] }
         }
       },
       {
         model: UserStatus,
         where: {
-          userStatusName: 'Activo'
+          userStatusName: UserStatusEnum.ACTIVE
         }
       }
     ],

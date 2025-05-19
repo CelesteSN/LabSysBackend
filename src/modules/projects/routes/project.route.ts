@@ -8,7 +8,7 @@ import { searchValidation } from '../validations/getAllProjectsQueryParam.valida
 import { updateProjectSchema } from "../validations/updateProject.validation";
 import {addMembersSchema} from "../validations/addMembers.validation";
 import {deleteMemberSchema} from "../validations/deleteMember.validation";
-
+import {stageSchema} from "../validations/createStage.schema";
 
 
 
@@ -24,9 +24,9 @@ projectRouter.get('/project-type',authenticateToken,checkBlacklist,  getAllProje
 
 // 🔹 Operaciones sobre etapas de un proyecto
 projectRouter.get('/:projectId/stages',authenticateToken,checkBlacklist,  getAllStages);
-projectRouter.post('/:projectId/stages',authenticateToken,checkBlacklist,  createStage);
+projectRouter.post('/:projectId/stages',authenticateToken,checkBlacklist,validateRequest({body: stageSchema}),  createStage);
 
-projectRouter.put('/stage/:stageId',authenticateToken,checkBlacklist, updateStage);
+projectRouter.put('/stage/:stageId',authenticateToken,checkBlacklist,validateRequest({body: stageSchema}), updateStage);
 projectRouter.delete('/stage/:stageId',authenticateToken,checkBlacklist,  deleteStageToProject);
 
 

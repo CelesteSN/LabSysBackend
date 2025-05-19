@@ -1,27 +1,33 @@
-// import  Stage  from "../models/stage.model";
+import  Stage  from "../models/stage.model";
+import { format } from 'date-fns';
 
-// export type AllStagesDto = {
-//   id: string;
-//   stageName: string;
-//   stageOrder: number;
-//   status: string;
-//   startDate?: Date | null;
-//   endDate?: Date | null;
-//   progress: number;
-// };
+export type AllStagesDto = {
+  id: string;
+  stageOrder: number;
+  stageName: string;
+  status: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  progress: number;
+};
 
-// export function mapStageToDto(stage: Stage): AllStagesDto {
-//   return {
-//     id: stage.stageId,
-//     stageName: stage.stageName,
-//     stageOrder: stage.stageOrder,
-//     status: stage.StageStatus.stageStatusName,
-//     startDate: stage.stageStartDate ?? null,
-//     endDate: stage.stageEndDate ?? null,
-//     progress: stage.stageProgress
-//   };
-// }
+export function mapStageToDto(stage: Stage): AllStagesDto {
+  return {
+    id: stage.stageId,
+    stageName: stage.stageName,
+    stageOrder: stage.stageOrder,
+    status: stage.StageStatus.stageStatusName,
+    startDate: formatDate(stage.stageStartDate),
+    endDate: formatDate(stage.stageEndDate),
+    progress: stage.stageProgress
+  };
+}
 
+
+function formatDate(date: Date | string | null): string | null {
+  if (!date) return null;
+  return format(new Date(date), 'dd-MM-yyyy');
+}
 //     //   createdDate: user.createdDate.toLocaleDateString('es-AR', {
 //     //     day: '2-digit',
 //     //     month: '2-digit',
@@ -38,74 +44,79 @@
 
 // DTOs
 
-export type StageDto = {
-  stageId: string;
-  stageName: string;
-  stageOrder: number;
-  stageProgress: number;
-  startDate: string | null; // string porque está formateada
-  endDate: string | null;
-  status: string | null;
-};
+// export type StageDto = {
+//   stageId: string;
+//   stageName: string;
+//   stageOrder: number;
+//   stageProgress: number;
+//   startDate: string; // string porque está formateada
+//   endDate: string;
+//   status: string;
+// };
 
-export type ProjectStagesDto = {
-  projectId?: string;
-  projectName: string;
-  projectDescription: string;
-  projectObjective: string;
-  startDate: Date | null;
-  endDate: Date | null;
-  status: string;
-  stages: StageDto[];
-};
+// export type ProjectStagesDto = {
+//   projectId?: string;
+//   // projectName: string;
+//   // projectDescription: string;
+//   // projectObjective: string;
+//   // startDate: Date | null;
+//   // endDate: Date | null;
+//   // status: string;
+//   stages: StageDto[];
+// };
 
-// Mapper
+// // Mapper
 
-import Stage from "../models/stage.model";
+// import Stage from "../models/stage.model";
+// import { format } from 'date-fns';
 
-export function mapToProjectStagesDto(stages: Stage[]): ProjectStagesDto {
-  if (stages.length === 0) {
-    return {
-      projectId: "",
-      projectName: "",
-      projectDescription: "",
-      projectObjective: "",
-      startDate: null,
-      endDate: null,
-      status: "",
-      stages: []
-    };
-  }
 
-  const project = stages[0].Project;
+// export function mapToProjectStagesDto(stages: Stage[]): ProjectStagesDto {
+//   if (stages.length === 0) {
+//     return {
+//       projectId: project.p,
+//       // projectName: "",
+//       // projectDescription: "",
+//       // projectObjective: "",
+//       // startDate: null,
+//       // endDate: null,
+//       // status: "",
+//       stages: []
+//     };
+//   }
 
-  const projectId = project?.projectId ?? "";
-  const projectName = project?.projectName ?? "";
-  const projectDescription = project?.projectDescription ?? "";
-  const projectObjective = project?.projectObjetive ?? "";
-  const startDate = project?.projectStartDate ?? null;
-  const endDate = project?.projectEndDate ?? null;
-  const projectStatus = project?.ProjectStatus?.projectStatusName ?? "";
+//   const project = stages[0].Project;
 
-  const stageDtos: StageDto[] = stages.map((s) => ({
-    stageId: s.stageId,
-    stageName: s.stageName,
-    stageOrder: s.stageOrder,
-    stageProgress: s.stageProgress,
-    startDate: s.stageStartDate ? s.stageStartDate.toLocaleDateString("es-AR") : null,
-    endDate: s.stageEndDate ? s.stageEndDate.toLocaleDateString("es-AR") : null,
-    status: s.StageStatus?.stageStatusName ?? null
-  }));
+//   const projectId = project?.projectId ?? "";
+//   // const projectName = project?.projectName ?? "";
+//   // const projectDescription = project?.projectDescription ?? "";
+//   // const projectObjective = project?.projectObjetive ?? "";
+//   // const startDate = project?.projectStartDate ?? null;
+//   // const endDate = project?.projectEndDate ?? null;
+//   // const projectStatus = project?.ProjectStatus?.projectStatusName ?? "";
 
-  return {
-    projectId,
-    projectName,
-    projectDescription,
-    projectObjective,
-    startDate,
-    endDate,
-    status: projectStatus,
-    stages: stageDtos
-  };
-}
+//   const stageDtos: StageDto[] = stages.map((s) => ({
+//     stageId: s.stageId,
+//     stageName: s.stageName,
+//     stageOrder: s.stageOrder,
+//     stageProgress: s.stageProgress,
+//    startDate: formatDate(s.stageStartDate),
+//     endDate: formatDate(s.stageEndDate),
+//     status: s.StageStatus?.stageStatusName ?? null
+//   }));
 
+//   return {
+//     projectId,
+//     // projectName,
+//     // projectDescription,
+//     // projectObjective,
+//     // startDate,
+//     // endDate,
+//     // status: projectStatus,
+//     stages: stageDtos
+//   };
+// }
+
+// function formatDate(date: Date | string): string {
+//   return format(new Date(date), 'dd-MM-yyyy');
+// }
