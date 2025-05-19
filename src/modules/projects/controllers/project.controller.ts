@@ -225,6 +225,21 @@ export const getAllProjectType = catchAsync(async (req: Request, res: Response) 
 
 export const getAllUsersProject = catchAsync(async(req: Request, res: Response)=>{
   const { userLoguedId } = (req as any).user;
+    const pageNumber = parseInt(req.query.pageNumber as string) || 0;
    const projectId = req.params.projectId;
-   const usersList = await getAvailableUsersForProject(userLoguedId , projectId)
+   const usersList = await getAvailableUsersForProject(userLoguedId , projectId, pageNumber);
+    if (usersList.length === 0) {
+    return res.status(200).json({
+      success: true,
+      pageNumber,
+      message: 'No se encontraron usuarios.',
+      data: []
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    pageNumber,
+    data: usersList,
+  });
 })

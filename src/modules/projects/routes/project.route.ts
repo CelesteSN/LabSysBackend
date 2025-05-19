@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createProject, getAllProjects, getProjectById, updateProject, deleteProject, getMembers, addMemberToProject, deleteMemberToProject, getAllStages, createStage, updateStage, deleteStageToProject, getAllProjectType} from "../controllers/project.controller";
+import { createProject, getAllProjects, getProjectById, updateProject, deleteProject, getMembers, addMemberToProject, deleteMemberToProject, getAllStages, createStage, updateStage, deleteStageToProject, getAllProjectType, getAllUsersProject} from "../controllers/project.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { projectValidationSchema } from '../validations/createProject.validation';
@@ -31,7 +31,7 @@ projectRouter.delete('/stage/:stageId',authenticateToken,checkBlacklist,  delete
 
 
 // // 🔹 Operaciones sobre miembros de un proyecto
-
+projectRouter.get('/:projectId/users',authenticateToken,checkBlacklist,  getAllUsersProject);
 projectRouter.get('/:projectId/members',authenticateToken,checkBlacklist,  getMembers);
 projectRouter.post('/:projectId/members',authenticateToken,checkBlacklist,validateRequest({body: addMembersSchema}),  addMemberToProject);
 projectRouter.delete('/:projectId/members',authenticateToken,checkBlacklist, validateRequest({body: deleteMemberSchema}), deleteMemberToProject);

@@ -24,6 +24,7 @@ import { mapProjectToDetailsDto } from "../dtos/listMembers.dto";
 import { parse } from 'date-fns';
 import { UserStatus } from "../models/userStatus.model";
 import { UserStatusEnum } from "../../users/enums/userStatus.enum";
+import { AllUsersDto, mapUserToDto } from "../dtos/userList.dto";
 
 
 
@@ -830,7 +831,14 @@ export async function listProjectType(userLoguedId: string) {
 
 
 
-export async function getAvailableUsersForProject(userloguedId: string , projectId: string): Promise<User[]> {
+export async function getAvailableUsersForProject(userLoguedId: string , projectId: string, pageNumber: number): Promise<AllUsersDto[]> {
+ 
+  const userValidated = await validateActiveUser(userLoguedId);
+  const userRole = await userValidated.getRole();
+
+  if (userRole.roleName !== RoleEnum.TUTOR) {
+    await validateProjectMembership(userLoguedId, projectId);
+  }
   // Obtener IDs de usuarios ya asignados al proyecto
   const assignedUsers = await ProjectUser.findAll({
     where: { projectUserProjectId: projectId },
@@ -844,6 +852,7 @@ export async function getAvailableUsersForProject(userloguedId: string , project
     where: {
       userId: { [Op.notIn]: assignedUserIds }
     },
+    attributes: ['userId', 'userFirstName', 'userLastName'],
     include: [
       {
         model: Role,
@@ -857,8 +866,11 @@ export async function getAvailableUsersForProject(userloguedId: string , project
           userStatusName: 'Activo'
         }
       }
-    ]
+    ],
+     order: [["userFirstName", "ASC"]],
+    limit: parseInt(appConfig.ROWS_PER_PAGE),
+    offset: parseInt(appConfig.ROWS_PER_PAGE) * pageNumber,
   });
 
-  return availableUsers;
+  return availableUsers.map(mapUserToDto)
 }
