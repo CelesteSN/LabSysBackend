@@ -153,7 +153,7 @@ export const getAllStages = catchAsync(async (req: Request, res: Response) => {
   const pageNumber = parseInt(req.query.pageNumber as string) || 0;
   const stageList = await listStages(userLoguedId, projectId, pageNumber);
 
-  if (stageList.length === 0) {
+  if (stageList.stages.length === 0) {
     return res.status(200).json({
       success: true,
       pageNumber,

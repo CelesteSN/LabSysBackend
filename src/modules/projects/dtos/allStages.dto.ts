@@ -1,6 +1,17 @@
 import  Stage  from "../models/stage.model";
 import { format } from 'date-fns';
 
+export type ProjectDetailsDto = {
+  projectId: string;
+  // projectName: string;
+  // description?: string | '';
+  // objetive?: string |'';
+  // startDate: string;
+  // endDate: string;
+   projectStatus: string; // Nombre del estado del proyecto
+  stages: AllStagesDto[]; // Lista de miembros
+};
+
 export type AllStagesDto = {
   id: string;
   stageOrder: number;
@@ -11,15 +22,29 @@ export type AllStagesDto = {
   progress: number;
 };
 
-export function mapStageToDto(stage: Stage): AllStagesDto {
+export function mapStageToDto(stages: Stage[]): ProjectDetailsDto {
+ 
+ if (stages.length === 0) {
+    throw new Error("No se encontraron tareas para el proyecto");
+  }
+
+  const firstStage = stages[0];
+  const project = firstStage.Project;
+ 
   return {
-    id: stage.stageId,
-    stageName: stage.stageName,
-    stageOrder: stage.stageOrder,
-    status: stage.StageStatus.stageStatusName,
-    startDate: formatDate(stage.stageStartDate),
-    endDate: formatDate(stage.stageEndDate),
-    progress: stage.stageProgress
+        projectId: project?.projectId ?? "",
+    projectStatus: project?.ProjectStatus?.projectStatusName ?? "Sin estado",
+    stages: stages.map(s => ({
+
+    id: s.stageId,
+    stageName: s.stageName,
+    stageOrder: s.stageOrder,
+    status: s.StageStatus.stageStatusName,
+    startDate: formatDate(s.stageStartDate),
+    endDate: formatDate(s.stageEndDate),
+    progress: s.stageProgress
+       }))
+ 
   };
 }
 

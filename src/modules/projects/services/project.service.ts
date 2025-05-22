@@ -18,7 +18,7 @@ import ProjectUser from "../models/projectUser.model";
 import { Role } from "../models/role.model";
 import Stage from "../models/stage.model";
 import { StageStatus } from "../models/stageStatus.model";
-import { AllStagesDto, mapStageToDto } from "../dtos/allStages.dto";
+import { AllStagesDto, mapStageToDto, ProjectDetailsDto } from "../dtos/allStages.dto";
 import { StageStatusEnum } from "../enums/stageStatus.enum";
 import { mapProjectToDetailsDto } from "../dtos/listMembers.dto";
 import { parse } from 'date-fns';
@@ -548,7 +548,7 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
 
 
 
-export async function listStages(userLoguedId: string, projectId: string, pageNumber: number): Promise<AllStagesDto[]> {
+export async function listStages(userLoguedId: string, projectId: string, pageNumber: number):Promise<ProjectDetailsDto> {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
@@ -581,17 +581,16 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
         model: StageStatus,
         attributes: ["stageStatusName"]
       },
-      // {
-      //   model: Project,
-      //   attributes: ["projectId", "projectName", "projectDescription", "projectObjetive", "projectStartDate", "projectEndDate"],
-      //   include: [
-      //     {
-      //       model: ProjectStatus,
-      //       attributes: ['projectStatusName'],
-      //       required: true
-      //     }
-      //   ]
-      // }
+      {
+        model: Project,
+        attributes: ["projectId"],
+        include: [
+          {
+            model: ProjectStatus,
+            attributes: ['projectStatusName'],
+          }
+        ]
+      }
     ],
 
 
@@ -599,11 +598,10 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * pageNumber,
   });
-  if (stageList.length === 0) {
-    return []// Devuelve el DTO vacío con datos del proyecto si querés
-  }
-  return stageList.map(mapStageToDto);
+ 
 
+ const result = mapStageToDto(stageList);
+  return result
 }
 
 

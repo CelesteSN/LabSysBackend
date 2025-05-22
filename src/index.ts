@@ -9,6 +9,7 @@ import { errorHandler } from "./middlewares/errorHandler";
 import { notificationRouter } from "./modules/notifications/routes/notification.route";
 import dotenv from "dotenv";
 import {projectRouter} from "./modules/projects/routes/project.route";
+import { taskRouter } from "./modules/tasks/routes/task.route";
 //import {connectToDatabase} from './config/database2';
 dotenv.config();
 
@@ -23,7 +24,9 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/projects", projectRouter);
 
-//app.use("/api/laboratories", laboratoryRouter);
+
+app.use("/api/v1/tasks", taskRouter);
+
 
 app.use(errorHandler);
 
