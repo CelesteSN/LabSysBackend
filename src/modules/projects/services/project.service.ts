@@ -26,6 +26,7 @@ import { UserStatus } from "../models/userStatus.model";
 import { UserStatusEnum } from "../../users/enums/userStatus.enum";
 import { AllUsersDto, mapUserToDto } from "../dtos/userList.dto";
 import { sendEmail } from '../../notifications/services/notification.service';
+import { mapOneStageToDto, OneStageDto } from "../dtos/oneStage.dto";
 
 
 
@@ -604,6 +605,41 @@ if (stageList.length == 0) {
     return null
   }
  const result = mapStageToDto(stageList);
+  return result
+}
+
+
+export async function getOneStage(userLoguedId: string, stageId: string):Promise<OneStageDto>{
+  
+  
+  const userValidated = await validateActiveUser(userLoguedId);
+  
+  const stage = await Stage.findOne({
+    where: { 
+      stageId: stageId,
+           },
+    include: [
+      {
+        model: StageStatus,
+        attributes: ["stageStatusName"]
+      },
+      {
+        model: Project,
+        attributes: ["projectId"],
+        include: [
+          {
+            model: ProjectStatus,
+            attributes: ['projectStatusName'],
+          }
+        ]
+      }
+    ],
+  });
+  
+if (!stage) {
+    throw new NotFoundResultsError();
+  }
+const result = mapOneStageToDto(stage)
   return result
 }
 

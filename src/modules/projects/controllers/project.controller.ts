@@ -3,7 +3,7 @@ import { AllProjectsDto } from "../dtos/allProjects.dto";
 import { ProjectFilter } from "../dtos/projectFilters.dto";
 import { ProjectStatusEnum } from "../enums/projectStatus.enum";
 import { ProjectType } from "../models/projectType.model";
-import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType, getAvailableUsersForProject } from "../services/project.service";
+import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType, getAvailableUsersForProject , getOneStage} from "../services/project.service";
 import { Request, Response } from "express";
 
 
@@ -183,6 +183,19 @@ export async function createStage(req: Request, res: Response): Promise<void> {
     message: "La etapa ha sido creada exitosamente."
   });
 }
+
+export const getStageById = catchAsync(async(req: Request, res: Response)=>{
+
+ const { userLoguedId } = (req as any).user;
+  const stageId = req.params.stageId;
+  const oneStage = await getOneStage(userLoguedId, stageId);
+ res.status(200).json({
+    success: true,
+    data: oneStage
+  });
+
+})
+
 
 
 export const updateStage = catchAsync(async (req: Request, res: Response) => {

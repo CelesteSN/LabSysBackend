@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createProject, getAllProjects, getProjectById, updateProject, deleteProject, getMembers, addMemberToProject, deleteMemberToProject, getAllStages, createStage, updateStage, deleteStageToProject, getAllProjectType, getAllUsersProject} from "../controllers/project.controller";
+import { createProject, getAllProjects, getProjectById, updateProject, deleteProject, getMembers, addMemberToProject, deleteMemberToProject, getAllStages, createStage, updateStage, deleteStageToProject, getAllProjectType, getAllUsersProject, getStageById} from "../controllers/project.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { projectValidationSchema } from '../validations/createProject.validation';
@@ -22,15 +22,17 @@ export const projectRouter = Router();
 projectRouter.get('/project-type',authenticateToken,checkBlacklist,  getAllProjectType);
 
 
-// 🔹 Operaciones sobre etapas de un proyecto
+// 🔹 Operaciones sobre etapas de un proyecto (cambiarlas por el body)
 projectRouter.get('/:projectId/stages',authenticateToken,checkBlacklist,  getAllStages);
 projectRouter.post('/:projectId/stages',authenticateToken,checkBlacklist,validateRequest({body: stageSchema}),  createStage);
 
+
+projectRouter.get('/stage/:stageId', authenticateToken,checkBlacklist, getStageById);
 projectRouter.put('/stage/:stageId',authenticateToken,checkBlacklist,validateRequest({body: stageSchema}), updateStage);
 projectRouter.delete('/stage/:stageId',authenticateToken,checkBlacklist,  deleteStageToProject);
 
 
-// // 🔹 Operaciones sobre miembros de un proyecto
+// // 🔹 Operaciones sobre miembros de un proyecto (cambiarlas por el body)
 projectRouter.get('/:projectId/users',authenticateToken,checkBlacklist,  getAllUsersProject);
 projectRouter.get('/:projectId/members',authenticateToken,checkBlacklist,  getMembers);
 projectRouter.post('/:projectId/members',authenticateToken,checkBlacklist,validateRequest({body: addMembersSchema}),  addMemberToProject);
