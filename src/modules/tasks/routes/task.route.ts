@@ -1,12 +1,12 @@
 import { Router } from "express";
-import { getAllTask} from "../controllers/task.controller";
+import { getAllTask, createTask, getTaskById, updateTask} from "../controllers/task.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
-// import { createUserValidation } from '../validations/createUserValidation';
-// import { checkBlacklist } from '../../../middlewares/checkBlacList.middleware';
+import { createTaskSchema } from '../schemas/createTask.schema';
+import { checkBlacklist } from '../../../middlewares/checkBlacList.middleware';
 // import { searchValidation } from '../validations/getAllUsersQueryParam.validation';
 // import { responseUserValidate } from "../validations/responseUserValidation";
-// import { updatedUserValidation } from "../validations/updatedUserValidation";
+import { updateTaskSchema } from "../schemas/updateTask.schema";
 
 
 
@@ -20,13 +20,14 @@ export const taskRouter = Router();
 
 taskRouter.get("/", 
     authenticateToken, 
-    //checkBlacklist, 
+    checkBlacklist, 
     //validateRequest({ query: searchValidation }), 
     getAllTask);
 
-//userRouter.post("/", 
-   // validateRequest({ body: createUserValidation }), 
-    //createUser);
+taskRouter.post("/", 
+    authenticateToken,
+    validateRequest({ body: createTaskSchema }), 
+    createTask);
 
 // 🟢 Rutas más específicas van primero
 // userRouter.put("/:id/answer", 
@@ -36,16 +37,16 @@ taskRouter.get("/",
 //     answerUser);
 
 // // 🔵 Luego las más generales
-// userRouter.get("/:id", 
-//     authenticateToken, 
-//     checkBlacklist, 
-//     getUserById);
+taskRouter.get("/:taskId", 
+  authenticateToken, 
+  checkBlacklist, 
+  getTaskById);
 
-// userRouter.put("/:id", 
-//     authenticateToken, 
-//     checkBlacklist, 
-//     validateRequest({ body: updatedUserValidation }), 
-//     updateUser);
+taskRouter.put("/:id", 
+   authenticateToken, 
+  checkBlacklist, 
+  validateRequest({ body: updateTaskSchema }), 
+  updateTask);
 
 // userRouter.delete("/:id", 
 //     authenticateToken, 

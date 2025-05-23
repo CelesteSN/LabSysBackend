@@ -145,7 +145,7 @@ export async function getProject(userLoguedId: string, projedId: string): Promis
     throw new ForbiddenAccessError()
   }
 
-  //Busco el usuario para id seleccionado
+  //Busco el proyecto para id seleccionado
   const project = await Project.findByPk(projedId, {
 
     include: [
@@ -548,7 +548,7 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
 
 
 
-export async function listStages(userLoguedId: string, projectId: string, pageNumber: number):Promise<ProjectDetailsDto> {
+export async function listStages(userLoguedId: string, projectId: string, pageNumber: number):Promise<ProjectDetailsDto|null> {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
@@ -598,8 +598,11 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * pageNumber,
   });
- 
-
+  
+if (stageList.length == 0) {
+    //throw new NotFoundResultsError();
+    return null
+  }
  const result = mapStageToDto(stageList);
   return result
 }

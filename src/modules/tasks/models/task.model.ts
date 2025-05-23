@@ -135,16 +135,19 @@ import {
 
   Task.belongsTo(TaskStatus, {
     //targetKey: "project_status_id",
-    foreignKey: 'task_status_id'
+    foreignKey: 'taskStatusId'
   });
   
   Task.belongsTo(User, {
     //targetKey: "ptoject_type_id",
-    foreignKey: 'task_user_id',
+    foreignKey: 'taskUserId',
   });
   Task.belongsTo(Stage, {
     //targetKey: "ptoject_type_id",
-    foreignKey: 'task_stage_id',
+    foreignKey: 'taskStageId',
   });
 
-  Stage.hasMany(Task);
+  Stage.hasMany(Task,{
+    //targetKey: "ptoject_type_id",
+    foreignKey: 'taskStageId',
+  });

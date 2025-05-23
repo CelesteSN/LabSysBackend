@@ -16,6 +16,7 @@ import { ProjectStatus } from "../models/projectStatus.model";
 import { ProjectStatusEnum } from "../../projects/enums/projectStatus.enum";
 import { StageStatus } from "../models/stageStatus.model";
 import { StageStatusEnum } from "../../projects/enums/stageStatus.enum";
+import { mapOneTaskToDto, OneTaskDto } from "../dtos/oneTask.dto";
 
 
 
@@ -27,43 +28,43 @@ export async function listTask(userLoguedId: string, projectId: string): Promise
 
 
     const taskList = await Task.findAll({
-  attributes: ["taskId", "taskTitle", "taskOrder", "taskPriority", "taskStartDate", "taskEndDate"],
-  include: [
-    {
-      model: TaskStatus,
-      attributes: ["taskStatusName"]
-    },
-    {
-      model: User,
-      attributes: ["userFirstName", "userLastName"]
-    },
-    {
-      model: Stage,
-      attributes: ["stageName", "stageOrder"],
-      include: [
-        {
-          model: Project,
-          where: { projectId },
-          attributes: ["projectId", "projectName"],
-          include: [
+        attributes: ["taskId", "taskTitle", "taskOrder", "taskPriority", "taskStartDate", "taskEndDate"],
+        include: [
             {
-              model: ProjectStatus,
-              attributes: ["projectStatusName"] // Corrige aquí el nombre
+                model: TaskStatus,
+                attributes: ["taskStatusName"]
+            },
+            {
+                model: User,
+                attributes: ["userFirstName", "userLastName"]
+            },
+            {
+                model: Stage,
+                attributes: ["stageName", "stageOrder"],
+                include: [
+                    {
+                        model: Project,
+                        where: { projectId },
+                        attributes: ["projectId", "projectName"],
+                        include: [
+                            {
+                                model: ProjectStatus,
+                                attributes: ["projectStatusName"] // Corrige aquí el nombre
+                            }
+                        ]
+                    }
+                ]
             }
-          ]
-        }
-      ]
-    }
-  ],
-order: [
-  [Stage, 'stageOrder', 'ASC'],
-  [Stage, 'stageName', 'ASC'],
-  ['taskOrder', 'ASC']
-]
-});
-  const result = mapTasksToProjectDetailsDto(taskList);
+        ],
+        order: [
+            [Stage, 'stageOrder', 'ASC'],
+            [Stage, 'stageName', 'ASC'],
+            ['taskOrder', 'ASC']
+        ]
+    });
+    const result = mapTasksToProjectDetailsDto(taskList);
 
-return result;
+    return result;
 
     //   const whereConditions: any = {};
 
@@ -115,7 +116,7 @@ return result;
 }
 
 
-export async function addTask(userLoguedId: string, stageId: string, taskName: string, taskOrder: number, taskDescription: string, taskStartDate: string, taskEndDate: string, priority: number) {
+export async function addTask(userLoguedId: string, stageId: string, taskName: string, taskOrder: number, taskStartDate: string, taskEndDate: string, taskDescription?: string, priority?: number) {
 
     const userValidated = await validateActiveUser(userLoguedId);
     const userRole = await userValidated.getRole();
@@ -125,14 +126,25 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
 
     //Valido si es miembro y si la etapa esta en estado pendiente o en preogreso
     const stage1 = await Stage.findOne({
-        where: { "stageId": stageId },
+        where: { stageId: stageId },
         include: [
             {
                 model: StageStatus,
                 where: { "stageStatusName": { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
             },
             {
-                model: Project
+                model: Project,
+                include: [
+                    {
+                        model: ProjectStatus,
+                        where: {
+                            projectStatusName: {
+                                [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+                            }
+                        },
+                        attributes: ["projectStatusName"]
+                    }
+                ]
             }
         ],
     })
@@ -142,86 +154,144 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
     await validateProjectMembership(userLoguedId, pro.projectId);
 
     //Valido el proyecto ingresado
-    const project = await Project.findOne({
-        where: { "projectStageId": stageId },
-        include: [
-            {
-                model: ProjectStatus,
-                where: {
-                    projectStatusName: {
-                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-                    }
-                },
-            },
-        ]
-    });
+    // const project = await Project.findOne({
+    //     where: { "projectStageId": stageId },
+    //     include: [
+    //         {
+    //             model: ProjectStatus,
+    //             where: {
+    //                 projectStatusName: {
+    //                     [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+    //                 }
+    //             },
+    //         },
+    //     ]
+    // });
 
-    if (!project) {
-        throw new NotFoundResultsError();
-    }
+    // if (!project) {
+    //     throw new NotFoundResultsError();
+    // }
 
 
     //Valido que el nombre ingresado no exista
-    const stageExists = await Task.findOne({
+    const taskExists = await Task.findOne({
         where: {
-            "taskTitle": taskName,
-            "taskStageId": stageId
+            taskTitle: taskName,
+            taskStageId: stageId
         },
     });
-    if (stageExists) { throw new NameUsedError() };
+    if (taskExists) { throw new NameUsedError() };
 
     //valido el orden
     const orderExist = await Task.findOne({
         where: {
-            "taskOrder": taskOrder,
-            "taskStageId": stageId
+            taskOrder: Number(taskOrder),
+            taskStageId: stageId
         }
     })
     if (orderExist) { throw new OrderExistsError() };
 
     //obtengo el estado pendiente
-    let status = await TaskStatus.findOne({
+    let statusPending = await TaskStatus.findOne({
         where: {
-            "taskStatusName": TaskStatusEnum.PENDING
+            taskStatusName: TaskStatusEnum.PENDING
         }
     });
     // console.log(status?.userStatusName)
-    if (!status) {
+    if (!statusPending) {
         throw new StatusNotFoundError();
 
     }
 
 
     const newTask = await Task.build();
-    newTask.taskTitle = taskName,
-        newTask.taskDescription = taskDescription,
-        newTask.taskOrder = taskOrder,
-        newTask.taskPriority = priority,
+        newTask.taskTitle = taskName,
+        newTask.taskDescription = taskDescription || null,
+        newTask.taskOrder = Number(taskOrder),
+        newTask.taskPriority = Number(priority) || null,
         newTask.createdDate = new Date(),
         newTask.updatedDate = new Date(),
         newTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date()),
         newTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
+        newTask.taskStageId = stage1.stageId,
+        newTask.taskStatusId = statusPending.taskStatusId,
+        newTask.taskUserId = userValidated.userId
 
-        await newTask.save();
+
+    await newTask.save();
+    return
 }
 
 
-export async function getOneTask(userLoguedId: string, taskId: string) {
+export async function getOneTask(userLoguedId: string, taskId: string): Promise<OneTaskDto> {
+
     const userValidated = await validateActiveUser(userLoguedId);
-    const oneTask = await Task.findOne({
+    const userRole = await userValidated.getRole();
+
+    const isRestrictedRole = [RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum);
+
+    const task = await Task.findOne({
         where: {
-            "taskId": taskId
+            taskId: taskId
         },
-        include: [{
-            model: TaskStatus
-        },
-        { model: User },
-        { model: Stage }],
-    });
-    return oneTask
+        include: [
+            {
+                model: TaskStatus,
+                where: {
+                    taskStatusName:
+                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
+                },
+                attributes: ["taskStatusName"]
+            },
+            {
+                model: User,
+                ...(isRestrictedRole
+                    ? {
+                        where: {
+                            userId: userLoguedId
+                        }
+                    }
+                    : {}),
+            },
+            {
+                model: Stage,
+                attributes: ["stageName"],
+                include: [
+                    {
+                        model: StageStatus,
+                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
+                    },
+                    {
+                        model: Project,
+                        include: [
+                            {
+                                model: ProjectStatus,
+                                where: {
+                                    projectStatusName: {
+                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ],
+            }]
+    })
+
+    if (!task) { throw new NotFoundResultsError(); }
+    const stageAux = await task.getStage();
+    const pro = await stageAux.getProject()
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, pro.projectId) || userRole.roleName === RoleEnum.TUTOR)) {
+        throw new ForbiddenAccessError()
+    }
+    const result = mapOneTaskToDto(task)
+
+    return result
 }
 
-export async function modifyTask(userLoguedId: string, taskId: string, taskName: string, taskOrder: number): Promise<Task | null> {
+
+
+export async function modifyTask(userLoguedId: string, taskId: string, taskName: string, taskOrder: number, taskStartDate: string, taskEndDate: string, taskStatus: string, taskDescription?: string, priority?: number): Promise<Task | null> {
 
     const userValidated = await validateActiveUser(userLoguedId);
     const userRole = await userValidated.getRole();
@@ -230,37 +300,67 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
         throw new ForbiddenAccessError()
     }
 
-    //Obtener el proyecto a partir de la etapa
+    //Obtener la tarea y la valido
     //Valido el proyecto ingresado
-    const taskUpdated = await Task.findOne({
-        where: { "taskId": taskId },
+    const updatedTask = await Task.findOne({
+        where: {
+            taskId: taskId
+        },
         include: [
             {
                 model: TaskStatus,
                 where: {
-                    taskStatusName: {
-                        [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING]
-                    }
+                    taskStatusName:
+                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
                 },
+                attributes: ["taskStatusName"]
             },
-        ]
-    });
+            {
+                model: User,
+                        where: {
+                            userId: userLoguedId
+                        }
+            },
+            {
+                model: Stage,
+                attributes: ["stageName"],
+                include: [
+                    {
+                        model: StageStatus,
+                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
+                    },
+                    {
+                        model: Project,
+                        include: [
+                            {
+                                model: ProjectStatus,
+                                where: {
+                                    projectStatusName: {
+                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ],
+            }]
+    })
 
-    if (!taskUpdated) {
-        throw new NotFoundResultsError();
+    if (!updatedTask) { throw new NotFoundResultsError(); }
+    const stageAux = await updatedTask.getStage();
+    const proy = await stageAux.getProject()
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId) )) {
+        throw new ForbiddenAccessError()
     }
 
-    const stage1 = await taskUpdated.getStage();
-    const pro = await stage1.getProject()
-    //Validar que este asignado al proyecto
-    await validateProjectMembership(userLoguedId, pro.projectId);
+
 
 
     //Valido que el nombre ingresado no exista
     const taskNameExists = await Task.findOne({
         where: {
             taskName: taskName,
-            taskStageId: stage1.stageId,
+            taskStageId: stageAux.stageId,
             stageId: { [Op.ne]: taskId } // excluye la etapa actual
         },
     });
@@ -271,26 +371,37 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
     const orderExist = await Task.findOne({
         where: {
             "taskOrder": taskOrder,
-            taskStageId: stage1.stageId,
+            taskStageId: stageAux.stageId,
             taskId: { [Op.ne]: taskId } // excluye la etapa actual
 
         }
     })
     if (orderExist) { throw new OrderExistsError() };
 
+    //valido el status
+    const validStatus = await TaskStatus.findOne({
+        where:{
+            taskStatusName : taskStatus
+        }
+    });
+    if (!validStatus) { throw new StatusNotFoundError() };
 
-    taskUpdated.taskTitle = taskName;
-    taskUpdated.taskOrder = taskOrder;
-    taskUpdated.updatedDate = new Date();
+    updatedTask.taskTitle = taskName;
+    updatedTask.taskOrder = taskOrder;
+    updatedTask.updatedDate = new Date();
+    updatedTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date()),
+    updatedTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
+    updatedTask.taskPriority = Number(priority) || null,
+    updatedTask.taskDescription = taskDescription || null,
+    updatedTask.taskStatusId = validStatus.taskStatusId,
 
 
-    await taskUpdated.save(); // Guardar los cambios en la base de datos
+    await updatedTask.save(); // Guardar los cambios en la base de datos
 
-    return taskUpdated;
+    return updatedTask;
 }
 
 
-//Función para validar si existe el usuario y si esta en estado activo
 
 
 
@@ -333,6 +444,7 @@ export async function lowTask(userLoguedId: string, taskId: string) {
 
 }
 
+//Función para validar si existe el usuario y si esta en estado activo
 
 export async function validateActiveUser(userId: string): Promise<User> {
 
@@ -363,6 +475,18 @@ export async function validateProjectMembership(userId: string, projectId: strin
     if (!isMember) {
         throw new ForbiddenAccessError("No tiene permiso para realizar esta acción en el proyecto.");
     }
+}
+
+
+export async function validateProjectMembershipWhitReturn(userId: string, projectId: string): Promise<boolean> {
+    const membership = await ProjectUser.findOne({
+        where: {
+            projectUserUserId: userId,
+            projectUserProjectId: projectId
+        }
+    });
+
+    return !!membership; // retorna true si existe, false si no
 }
 
 
