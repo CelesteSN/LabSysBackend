@@ -25,9 +25,7 @@ export type AllTasksDto = {
 };
 
 export function mapTasksToProjectDetailsDto(tasks: Task[]): ProjectDetailsDto {
-  if (tasks.length === 0) {
-    throw new Error("No se encontraron tareas para el proyecto");
-  }
+  
 
   const firstTask = tasks[0];
   const project = firstTask.Stage?.Project;

@@ -1,4 +1,6 @@
 import { AllTasksDto } from "../dtos/allTask.dto";
+import { TaskFilter } from "../dtos/taskFilters.dto";
+import { TaskStatusEnum } from "../enums/taskStatus.enum";
 import { listTask, addTask, getOneTask, modifyTask } from "../services/task.service";
 import { Request, Response } from "express";
 
@@ -7,27 +9,28 @@ export async function getAllTask(req: Request, res: Response) {
 
     const projectId = req.body.projectId
 
-    //const pageNumber = parseInt(req.query.pageNumber as string) || 0;
+    const pageNumber = parseInt(req.query.pageNumber as string) || 0;
 
-    //   const filters: ProjectFilter = {
-    //     pageNumber,
-    //     search: req.query.search as string,
-    //     status: req.query.status as ProjectStatusEnum || undefined,
-    //   };
-    const tasks = await listTask(userLoguedId, projectId);
+    const filters: TaskFilter = {
+        pageNumber,
+        search: req.query.search as string,
+        status: req.query.status as TaskStatusEnum || undefined,
+        priority: req.query.priority ? parseInt(req.query.priority as string) : undefined,
+    };
+    
+    const tasks = await listTask(userLoguedId, projectId, filters);
 
-    if (tasks.tasks.length === 0) {
-        return res.status(200).json({
-            success: true,
-            //pageNumber,
-            message: 'No se encontraron resultados',
-            data: []
-        });
-    }
+    if (tasks == null) {
+    return res.status(200).json({
+      success: true,
+      message: 'No se encontraron etapas asociadas al proyecto.',
+      data: []
+    });
+  }
 
     return res.status(200).json({
         success: true,
-        //pageNumber,
+        pageNumber,
         data: tasks,
     });
 };
@@ -61,10 +64,10 @@ export async function getTaskById(req: Request, res: Response) {
         success: true,
         data: task
     });
-} 
+}
 
-export async function updateTask(req: Request, res: Response){
-     const { userLoguedId } = (req as any).user;
+export async function updateTask(req: Request, res: Response) {
+    const { userLoguedId } = (req as any).user;
     const taskId = req.params.taskId;
     const taskName = req.body.taskName;
     const taskOrder = req.body.taskOrder;
@@ -74,10 +77,10 @@ export async function updateTask(req: Request, res: Response){
     const taskStatus = req.body.taskStatus;
     const priority = req.body.priority;
 
-await modifyTask(userLoguedId, taskId , taskName , taskOrder , taskStartDate , taskEndDate , taskStatus , taskDescription, priority);
- res.status(200).json({
-    success: true,
-    message: "El proyecto ha sido modificado exitosamente"
-  })
+    await modifyTask(userLoguedId, taskId, taskName, taskOrder, taskStartDate, taskEndDate, taskStatus, taskDescription, priority);
+    res.status(200).json({
+        success: true,
+        message: "El proyecto ha sido modificado exitosamente"
+    })
 
 }

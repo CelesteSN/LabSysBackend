@@ -17,26 +17,60 @@ import { ProjectStatusEnum } from "../../projects/enums/projectStatus.enum";
 import { StageStatus } from "../models/stageStatus.model";
 import { StageStatusEnum } from "../../projects/enums/stageStatus.enum";
 import { mapOneTaskToDto, OneTaskDto } from "../dtos/oneTask.dto";
+import { TaskFilter } from "../dtos/taskFilters.dto";
+import { appConfig } from "../../../config/app";
 
 
-
-
-//export async function listTask(userLoguedId: string, filters: taskFilters): Promise<AllTasksDto[]> {
-export async function listTask(userLoguedId: string, projectId: string): Promise<ProjectDetailsDto> {
+export async function listTask(userLoguedId: string, projectId: string, filters: TaskFilter): Promise<ProjectDetailsDto|null> {
     const userValidated = await validateActiveUser(userLoguedId);
     const userRole = await userValidated.getRole();
+    const isRestrictedRole = [RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum);
 
+    const whereConditions: any = {};
 
+    // Filtro por búsqueda
+    if (filters?.search) {
+        whereConditions[Op.or] = [
+            { taskTitle: { [Op.iLike]: `%${filters.search}%` } }
+        ];
+    }
+
+    // // Filtro por estado de la tarea (taskStatusId)
+    // if (filters?.status) {
+    //     whereConditions.taskStatusName = filters.status;
+    // }
+
+    // Filtro por prioridad
+    if (filters?.priority) {
+        whereConditions.taskPriority = filters.priority;
+    }
     const taskList = await Task.findAll({
+        where: whereConditions,
         attributes: ["taskId", "taskTitle", "taskOrder", "taskPriority", "taskStartDate", "taskEndDate"],
         include: [
             {
-                model: TaskStatus,
-                attributes: ["taskStatusName"]
+                 model: TaskStatus,
+            attributes: ["taskStatusName"],
+            ...(filters?.status
+                ? {
+                    where: {
+                        taskStatusName: {
+                            [Op.iLike]: `%${filters.status}%`
+                        }
+                    }
+                }
+                : {})
             },
             {
                 model: User,
-                attributes: ["userFirstName", "userLastName"]
+                attributes: ["userFirstName", "userLastName"],
+                ...(isRestrictedRole
+                    ? {
+                        where: {
+                            userId: userLoguedId
+                        }
+                    }
+                    : {}),
             },
             {
                 model: Stage,
@@ -49,7 +83,7 @@ export async function listTask(userLoguedId: string, projectId: string): Promise
                         include: [
                             {
                                 model: ProjectStatus,
-                                attributes: ["projectStatusName"] // Corrige aquí el nombre
+                                attributes: ["projectStatusName"]
                             }
                         ]
                     }
@@ -60,60 +94,19 @@ export async function listTask(userLoguedId: string, projectId: string): Promise
             [Stage, 'stageOrder', 'ASC'],
             [Stage, 'stageName', 'ASC'],
             ['taskOrder', 'ASC']
-        ]
+        ],
+        limit: parseInt(appConfig.ROWS_PER_PAGE),
+        offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
     });
+if (taskList.length == 0) {
+    //throw new NotFoundResultsError();
+    return null
+  }
     const result = mapTasksToProjectDetailsDto(taskList);
-
     return result;
-
-    //   const whereConditions: any = {};
-
-    //   const statusRaw = filters?.status?.trim();
-    //   const status = statusRaw ?? ProjectStatusEnum.INPROGRESS;
-    //   const isStatusAll = status.toLowerCase() === ProjectStatusEnum.ALL.toLowerCase();
-
-    //   if (filters?.search) {
-    //     whereConditions[Op.or] = [
-    //       { projectName: { [Op.iLike]: `%${filters.search}%` } }, // corregido el typo
-    //     ];
-    //   }
-
-    //   // Configuración base del query
-    //   const baseQuery: any = {
-    //     where: whereConditions,
-    //     attributes: ['projectId', 'projectName', 'projectStartDate', 'projectEndDate', 'createdDate'],
-    //     include: [],
-    //     order: [["createdDate", "ASC"]],
-    //     limit: parseInt(appConfig.ROWS_PER_PAGE),
-    //     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-    //   };
-
-    //   // Filtro por estado del proyecto
-    //   const statusInclude = {
-    //     model: TaskStatus,
-    //     attributes: ['projectStatusName'],
-    //     ...(isStatusAll ? {} : { where: { projectStatusName: status } })
-    //   };
-
-    //   // Condicional por rol
-    //   if (userRole.roleName === RoleEnum.TUTOR) {
-    //     baseQuery.include.push(statusInclude);
-    //   } else if (RoleEnum.BECARIO === userRole.roleName || userRole.roleName === RoleEnum.PASANTE) {
-    //     baseQuery.include.push(
-    //       {
-    //         model: ProjectUser,
-    //         as: "projectUsers",
-    //         where: {
-    //           projectUserUserId: userValidated.userId
-    //         }
-    //       },
-    //       statusInclude
-    //     );
-    //   }
-
-    //   const projects = await Project.findAll(baseQuery);
-    //   return projects.map(mapProjectToDto);
 }
+
+
 
 
 export async function addTask(userLoguedId: string, stageId: string, taskName: string, taskOrder: number, taskStartDate: string, taskEndDate: string, taskDescription?: string, priority?: number) {
@@ -205,7 +198,7 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
 
 
     const newTask = await Task.build();
-        newTask.taskTitle = taskName,
+    newTask.taskTitle = taskName,
         newTask.taskDescription = taskDescription || null,
         newTask.taskOrder = Number(taskOrder),
         newTask.taskPriority = Number(priority) || null,
@@ -317,9 +310,9 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
             },
             {
                 model: User,
-                        where: {
-                            userId: userLoguedId
-                        }
+                where: {
+                    userId: userLoguedId
+                }
             },
             {
                 model: Stage,
@@ -349,7 +342,7 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
     if (!updatedTask) { throw new NotFoundResultsError(); }
     const stageAux = await updatedTask.getStage();
     const proy = await stageAux.getProject()
-    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId) )) {
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
         throw new ForbiddenAccessError()
     }
 
@@ -380,8 +373,8 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
 
     //valido el status
     const validStatus = await TaskStatus.findOne({
-        where:{
-            taskStatusName : taskStatus
+        where: {
+            taskStatusName: taskStatus
         }
     });
     if (!validStatus) { throw new StatusNotFoundError() };
@@ -390,13 +383,13 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
     updatedTask.taskOrder = taskOrder;
     updatedTask.updatedDate = new Date();
     updatedTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date()),
-    updatedTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
-    updatedTask.taskPriority = Number(priority) || null,
-    updatedTask.taskDescription = taskDescription || null,
-    updatedTask.taskStatusId = validStatus.taskStatusId,
+        updatedTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
+        updatedTask.taskPriority = Number(priority) || null,
+        updatedTask.taskDescription = taskDescription || null,
+        updatedTask.taskStatusId = validStatus.taskStatusId,
 
 
-    await updatedTask.save(); // Guardar los cambios en la base de datos
+        await updatedTask.save(); // Guardar los cambios en la base de datos
 
     return updatedTask;
 }
