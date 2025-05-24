@@ -1,7 +1,8 @@
+import { catchAsync } from "../../../utils/catchAsync";
 import { AllTasksDto } from "../dtos/allTask.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import { listTask, addTask, getOneTask, modifyTask } from "../services/task.service";
+import { listTask, addTask, getOneTask, modifyTask, lowTask } from "../services/task.service";
 import { Request, Response } from "express";
 
 export async function getAllTask(req: Request, res: Response) {
@@ -74,13 +75,24 @@ export async function updateTask(req: Request, res: Response) {
     const taskStartDate = req.body.taskStartDate;
     const taskEndDate = req.body.taskEndDate;
     const taskDescription = req.body.taskDescription;
-    const taskStatus = req.body.taskStatus;
+    const taskStatusId = req.body.taskStatusId;
     const priority = req.body.priority;
 
-    await modifyTask(userLoguedId, taskId, taskName, taskOrder, taskStartDate, taskEndDate, taskStatus, taskDescription, priority);
+    await modifyTask(userLoguedId, taskId, taskName, taskOrder, taskStartDate, taskEndDate, taskStatusId, taskDescription, priority);
     res.status(200).json({
         success: true,
-        message: "El proyecto ha sido modificado exitosamente"
+        message: "La tarea ha sido modificada exitosamente"
     })
 
 }
+
+
+export const deleteTask = catchAsync(async (req: Request, res: Response) => {
+  const taskId = req.params.taskId;
+  const { userLoguedId } = (req as any).user;
+  await lowTask(userLoguedId, taskId);
+  res.status(200).json({
+    success: true,
+    message: "La tarea ha sido eliminada exitosamente"
+  })
+})

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAllTask, createTask, getTaskById, updateTask} from "../controllers/task.controller";
+import { getAllTask, createTask, getTaskById, updateTask, deleteTask} from "../controllers/task.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { createTaskSchema } from '../schemas/createTask.schema';
@@ -42,13 +42,13 @@ taskRouter.get("/:taskId",
   checkBlacklist, 
   getTaskById);
 
-taskRouter.put("/:id", 
+taskRouter.put("/:taskId", 
    authenticateToken, 
   checkBlacklist, 
   validateRequest({ body: updateTaskSchema }), 
   updateTask);
 
-// userRouter.delete("/:id", 
-//     authenticateToken, 
-//     checkBlacklist, 
-//     deleteUser);
+taskRouter.delete("/:taskId", 
+    authenticateToken, 
+    checkBlacklist, 
+    deleteTask);
