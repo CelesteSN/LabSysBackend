@@ -60,6 +60,14 @@ export class UserPendingError extends BaseError {
     }
 }
 
+export class NotValidDatesError extends BaseError {
+    constructor(){
+        super("La fecha de finalización debe ser igual o posterior a la fecha de inicio.", 404);
+    }
+}
+
+
+
 // Otros errores iguales...
 
 export class ForbiddenError extends BaseError {

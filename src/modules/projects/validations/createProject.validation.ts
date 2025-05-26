@@ -17,7 +17,9 @@ export const projectValidationSchema = Joi.object({
     .required()
     .messages({
       "string.guid": "El tipo de proyecto debe ser un UUID válido.",
-      "any.required": "El tipo de proyecto es obligatorio."
+      "any.required": "El tipo de proyecto es obligatorio.",
+     "string.empty": "El tipo de proyecto es obligatorio.",
+
     }),
      startDate: Joi.string()
     .pattern(/^\d{2}-\d{2}-\d{4}$/)

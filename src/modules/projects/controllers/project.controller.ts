@@ -1,9 +1,12 @@
+import dayjs from "dayjs";
 import { catchAsync } from "../../../utils/catchAsync";
 import { AllProjectsDto } from "../dtos/allProjects.dto";
 import { ProjectFilter } from "../dtos/projectFilters.dto";
+import { TaskFilter } from "../dtos/taskFilters.dto";
 import { ProjectStatusEnum } from "../enums/projectStatus.enum";
+import { TaskStatusEnum } from "../enums/taskStatus.enum";
 import { ProjectType } from "../models/projectType.model";
-import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType, getAvailableUsersForProject , getOneStage} from "../services/project.service";
+import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType, getAvailableUsersForProject , getOneStage, listTask, validateProjectDates} from "../services/project.service";
 import { Request, Response } from "express";
 
 
@@ -13,7 +16,7 @@ export async function getAllProjects(req: Request, res: Response) {
 
   const filters: ProjectFilter = {
     pageNumber,
-    search: req.query.search as string,
+    search: req.query.search as string || undefined,
     status: req.query.status as ProjectStatusEnum || undefined,
   };
   const projects: AllProjectsDto[] = await listProjects(userLoguedId, filters);
@@ -44,6 +47,10 @@ export async function createProject(req: Request, res: Response): Promise<void> 
   const projectTypeId = req.body.projectTypeId;
   const startDate = req.body.startDate;
   const endDate = req.body.endDate;
+
+// Validar fechas
+  await validateProjectDates(startDate, endDate);
+
   const newProject = await saveNewProject(userLoguedId, projectName, projectTypeId, startDate, endDate);
   res.status(201).json({
     success: true,
@@ -70,13 +77,16 @@ export const updateProject = catchAsync(async (req: Request, res: Response) => {
   const { userLoguedId } = (req as any).user;
   const projectId = req.params.projectId;
   const projectName = req.body.projectName;
-  const description = req.body.description;
-  const objetive = req.body.objetive;
+  const description = req.body.description || null;
+  const objetive = req.body.objetive || null;
   const startDate = req.body.startDate;
   const endDate = req.body.endDate;
 
+// Validar fechas
+  await validateProjectDates(startDate, endDate);
 
-  const user = await modifyProject(userLoguedId, projectId, projectName, description, objetive, startDate, endDate );
+
+  const user = await modifyProject(userLoguedId, projectId, projectName,  startDate, endDate, description, objetive );
   res.status(200).json({
     success: true,
     message: "El proyecto ha sido modificado exitosamente"
@@ -209,7 +219,7 @@ export const updateStage = catchAsync(async (req: Request, res: Response) => {
   const user = await modifyStage(userLoguedId, stagetId, stageName, stageOrder);
   res.status(200).json({
     success: true,
-    messaje: "La etapa ha sido modificada exitosamente"
+    message: "La etapa ha sido modificada exitosamente"
   })
 
 });
@@ -264,3 +274,35 @@ export const getAllUsersProject = catchAsync(async(req: Request, res: Response)=
     data: usersList,
   });
 })
+
+
+export async function getAllTask(req: Request, res: Response) {
+    const { userLoguedId } = (req as any).user;
+
+    const projectId = req.params.projectId
+
+    const pageNumber = parseInt(req.query.pageNumber as string) || 0;
+
+    const filters: TaskFilter = {
+        pageNumber,
+        search: req.query.search as string,
+        status: req.query.status as TaskStatusEnum || undefined,
+        priority: req.query.priority ? parseInt(req.query.priority as string) : undefined,
+    };
+    
+    const tasks = await listTask(userLoguedId, projectId, filters);
+
+    if (tasks == null) {
+    return res.status(200).json({
+      success: true,
+      message: 'No se encontraron etapas asociadas al proyecto.',
+      data: []
+    });
+  }
+
+    return res.status(200).json({
+        success: true,
+        pageNumber,
+        data: tasks,
+    });
+};

@@ -19,94 +19,10 @@ import { StageStatusEnum } from "../../projects/enums/stageStatus.enum";
 import { mapOneTaskToDto, OneTaskDto } from "../dtos/oneTask.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { appConfig } from "../../../config/app";
+import { Comment } from "../models/comment.model";
 
 
-export async function listTask(userLoguedId: string, projectId: string, filters: TaskFilter): Promise<ProjectDetailsDto | null> {
-    const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
-    const isRestrictedRole = [RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum);
-    if (isRestrictedRole) {
-        await validateProjectMembership(userLoguedId, projectId);
-    }
 
-    //await validateProjectMembership(userLoguedId, projectId);
-
-    const whereConditions: any = {};
-
-    // Filtro por búsqueda
-    if (filters?.search) {
-        whereConditions[Op.or] = [
-            { taskTitle: { [Op.iLike]: `%${filters.search}%` } }
-        ];
-    }
-
-    // Filtro por prioridad
-    if (filters?.priority) {
-        whereConditions.taskPriority = filters.priority;
-    }
-
-
-    const taskList = await Task.findAll({
-        where: whereConditions,
-        attributes: ["taskId", "taskTitle", "taskOrder", "taskPriority", "taskStartDate", "taskEndDate"],
-        include: [
-            {
-                model: TaskStatus,
-                attributes: ["taskStatusName"],
-                ...(filters?.status
-                    ? {
-                        where: {
-                            taskStatusName: {
-                                [Op.iLike]: `%${filters.status}%`
-                            }
-                        }
-                    }
-                    : {})
-            },
-            {
-                model: User,
-                attributes: ["userFirstName", "userLastName"],
-                ...(isRestrictedRole
-                    ? {
-                        where: {
-                            userId: userLoguedId
-                        }
-                    }
-                    : {}),
-            },
-            {
-                model: Stage,
-                attributes: ["stageName", "stageOrder"],
-                include: [
-                    {
-                        model: Project,
-                        where: { projectId },
-                        attributes: ["projectId", "projectName"],
-                        include: [
-                            {
-                                model: ProjectStatus,
-                                attributes: ["projectStatusName"]
-                            }
-                        ]
-                    }
-                ]
-            }
-        ],
-        order: [
-            [Stage, 'stageOrder', 'ASC'],
-            [Stage, 'stageName', 'ASC'],
-            ['taskOrder', 'ASC']
-        ],
-        limit: parseInt(appConfig.ROWS_PER_PAGE),
-        offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-    });
-    if (taskList.length == 0) {
-        //throw new NotFoundResultsError();
-        return null
-    }
-    const result = mapTasksToProjectDetailsDto(taskList);
-    return result;
-}
 
 
 
@@ -268,6 +184,7 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
 
     const isRestrictedRole = [RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum);
 
+
     const task = await Task.findOne({
         where: {
             taskId: taskId
@@ -313,7 +230,8 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
                         ]
                     }
                 ],
-            }]
+            }
+        ]
     })
 
     if (!task) { throw new NotFoundResultsError(); }

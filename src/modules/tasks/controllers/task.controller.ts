@@ -2,39 +2,10 @@ import { catchAsync } from "../../../utils/catchAsync";
 import { AllTasksDto } from "../dtos/allTask.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import { listTask, addTask, getOneTask, modifyTask, lowTask } from "../services/task.service";
+import {  addTask, getOneTask, modifyTask, lowTask } from "../services/task.service";
 import { Request, Response } from "express";
 
-export async function getAllTask(req: Request, res: Response) {
-    const { userLoguedId } = (req as any).user;
 
-    const projectId = req.body.projectId
-
-    const pageNumber = parseInt(req.query.pageNumber as string) || 0;
-
-    const filters: TaskFilter = {
-        pageNumber,
-        search: req.query.search as string,
-        status: req.query.status as TaskStatusEnum || undefined,
-        priority: req.query.priority ? parseInt(req.query.priority as string) : undefined,
-    };
-    
-    const tasks = await listTask(userLoguedId, projectId, filters);
-
-    if (tasks == null) {
-    return res.status(200).json({
-      success: true,
-      message: 'No se encontraron etapas asociadas al proyecto.',
-      data: []
-    });
-  }
-
-    return res.status(200).json({
-        success: true,
-        pageNumber,
-        data: tasks,
-    });
-};
 
 
 export async function createTask(req: Request, res: Response) {

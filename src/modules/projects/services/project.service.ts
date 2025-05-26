@@ -7,7 +7,7 @@ import { ProjectTypeEnum } from "../enums/projectType.enum";
 import { ProjectType } from "../models/projectType.model";
 import { randomUUID } from "crypto";
 import { User } from "../models/user.model"
-import { ForbiddenAccessError, UserNotFoundError, NameUsedError, NotFoundResultsError, StatusNotFoundError, OrderExistsError } from "../../../errors/customUserErrors";
+import { ForbiddenAccessError, UserNotFoundError, NameUsedError, NotFoundResultsError, StatusNotFoundError, OrderExistsError, NotValidDatesError } from "../../../errors/customUserErrors";
 import { RoleEnum } from "../../users/enums/role.enum";
 import { Op } from "sequelize";
 import { ProjectFilter } from "../dtos/projectFilters.dto";
@@ -27,6 +27,11 @@ import { UserStatusEnum } from "../../users/enums/userStatus.enum";
 import { AllUsersDto, mapUserToDto } from "../dtos/userList.dto";
 import { sendEmail } from '../../notifications/services/notification.service';
 import { mapOneStageToDto, OneStageDto } from "../dtos/oneStage.dto";
+import { Task } from "../models/task.model";
+import { TaskStatus } from "../models/taskStatus.model";
+import { TaskFilter } from "../dtos/taskFilters.dto";
+import { mapTasksToProjectDetailsDto, ProjectDetails1Dto } from "../dtos/allTask.dto";
+import { TaskStatusEnum } from "../enums/taskStatus.enum";
 
 
 
@@ -39,7 +44,7 @@ export async function listProjects(userLoguedId: string, filters: ProjectFilter)
   const whereConditions: any = {};
 
   const statusRaw = filters?.status?.trim();
-  const status = statusRaw ?? ProjectStatusEnum.INPROGRESS;
+  const status = statusRaw ?? ProjectStatusEnum.ACTIVE;
   const isStatusAll = status.toLowerCase() === ProjectStatusEnum.ALL.toLowerCase();
 
   if (filters?.search) {
@@ -184,7 +189,7 @@ export async function validateProjectMembershipWhitReturn(userId: string, projec
 }
 
 
-export async function modifyProject(userLoguedId: string, projectId: string, name: string, description: string, objetive: string, startDate: string, endDate: string): Promise<Project | null> {
+export async function modifyProject(userLoguedId: string, projectId: string, name: string, startDate: string, endDate: string, description?: string, objetive?: string,): Promise<Project | null> {
 
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
@@ -226,8 +231,12 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
   }
 
   updatedProject.projectName = name;
-  updatedProject.projectDescription = description;
-  updatedProject.projectObjetive = objetive;
+  if (updatedProject.projectDescription != null) {
+    updatedProject.projectDescription = description;
+  };
+  if (updatedProject.projectObjetive != null) {
+    updatedProject.projectObjetive = objetive;
+  }
   updatedProject.updatedDate = new Date();
   updatedProject.projectStartDate = parse(startDate, 'dd-MM-yyyy', new Date()),
     updatedProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
@@ -236,6 +245,23 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
 
   return updatedProject;
 }
+
+
+
+export function validateProjectDates(startDate: string, endDate: string): void {
+  // Espera formato "dd-MM-yyyy"
+  const [startDay, startMonth, startYear] = startDate.split("-");
+  const [endDay, endMonth, endYear] = endDate.split("-");
+
+  const parsedStartDate = new Date(`${startYear}-${startMonth}-${startDay}`);
+  const parsedEndDate = new Date(`${endYear}-${endMonth}-${endDay}`);
+
+  if (parsedEndDate < parsedStartDate) {
+    throw new NotValidDatesError();
+  }
+}
+
+
 
 
 
@@ -472,13 +498,13 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
   // Guardar en DB
   await ProjectUser.bulkCreate(projectUsersToCreate);
 
-//  // Enviar emails a los usuarios
+  //  // Enviar emails a los usuarios
   for (const userId of userIds) {
 
-  const user = await User.findByPk(userId);
-if (!user) {
+    const user = await User.findByPk(userId);
+    if (!user) {
       throw new ForbiddenAccessError(`El usuario con ID "${userId}" no existe.`);
-    }  const html = `
+    } const html = `
       <p>Estimado/a ${user.userFirstName} ${user.userLastName},</p>
       <p>Le informamos que ha sido asignado al proyecto <strong>${project.projectName}</strong>.</p>
       <p>Para visualizar los detalles del proyecto, ingrese al sistema a través del siguiente botón: “Iniciar sesión”.</p>
@@ -533,6 +559,38 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
     throw new NotFoundResultsError();
   }
 
+    //busco el estado "Dada de baja" de la tarea
+
+
+ const lowStatus = await TaskStatus.findOne({
+      where: {
+        taskStatusName : TaskStatusEnum.LOW
+      }
+    });
+    if(!lowStatus){throw new StatusNotFoundError};
+
+  //eliminar tareas asociadas 
+  const tasksToDelete = await Task.findAll({
+    where: { taskUserId: userId },
+    include: [{
+      model: Stage,
+      include: [{
+        model: Project,
+        where: {
+          projectId: projectId
+        }
+      }]
+    },
+    ] 
+  });
+
+  for (const task of tasksToDelete) {
+    //await task.destroy();
+     await task.setTaskStatus(lowStatus.taskStatusId);
+     task.deletedDate = new Date();
+  }
+
+//Elimino el proyecto
   const oneProjectUser = await ProjectUser.findOne({
     where: {
       "projectUserProjectId": project.projectId,
@@ -544,12 +602,16 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
     throw new NotFoundResultsError();
   }
   await oneProjectUser.destroy();
+
+   
+
+// contar si no le quedan tareas a la etapa cambiarla a estaso pendiente y recalcular fechas
   return
 }
 
 
 
-export async function listStages(userLoguedId: string, projectId: string, pageNumber: number):Promise<ProjectDetailsDto|null> {
+export async function listStages(userLoguedId: string, projectId: string, pageNumber: number): Promise<ProjectDetailsDto | null> {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
@@ -599,25 +661,25 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * pageNumber,
   });
-  
-if (stageList.length == 0) {
+
+  if (stageList.length == 0) {
     //throw new NotFoundResultsError();
     return null
   }
- const result = mapStageToDto(stageList);
+  const result = mapStageToDto(stageList);
   return result
 }
 
 
-export async function getOneStage(userLoguedId: string, stageId: string):Promise<OneStageDto>{
-  
-  
+export async function getOneStage(userLoguedId: string, stageId: string): Promise<OneStageDto> {
+
+
   const userValidated = await validateActiveUser(userLoguedId);
-  
+
   const stage = await Stage.findOne({
-    where: { 
+    where: {
       stageId: stageId,
-           },
+    },
     include: [
       {
         model: StageStatus,
@@ -635,11 +697,11 @@ export async function getOneStage(userLoguedId: string, stageId: string):Promise
       }
     ],
   });
-  
-if (!stage) {
+
+  if (!stage) {
     throw new NotFoundResultsError();
   }
-const result = mapOneStageToDto(stage)
+  const result = mapOneStageToDto(stage)
   return result
 }
 
@@ -872,7 +934,7 @@ export async function lowStage(userLoguedId: string, stageId: string) {
   // deletedproject.setProjectStatus(statusLow.projectStatusId)
   // deletedproject.deletedDate = new Date(); // Eliminar el usuario de la base de datos
   // await deletedproject.save();
-   return
+  return
 
 }
 
@@ -927,4 +989,93 @@ export async function getAvailableUsersForProject(userLoguedId: string, projectI
   });
 
   return availableUsers.map(mapUserToDto)
+}
+
+
+
+export async function listTask(userLoguedId: string, projectId: string, filters: TaskFilter): Promise<ProjectDetails1Dto | null> {
+  const userValidated = await validateActiveUser(userLoguedId);
+  const userRole = await userValidated.getRole();
+  const isRestrictedRole = [RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum);
+  if (isRestrictedRole) {
+    await validateProjectMembership(userLoguedId, projectId);
+  }
+
+  //await validateProjectMembership(userLoguedId, projectId);
+
+  const whereConditions: any = {};
+
+  // Filtro por búsqueda
+  if (filters?.search) {
+    whereConditions[Op.or] = [
+      { taskTitle: { [Op.iLike]: `%${filters.search}%` } }
+    ];
+  }
+
+  // Filtro por prioridad
+  if (filters?.priority) {
+    whereConditions.taskPriority = filters.priority;
+  }
+
+
+  const taskList = await Task.findAll({
+    where: whereConditions,
+    attributes: ["taskId", "taskTitle", "taskOrder", "taskPriority", "taskStartDate", "taskEndDate"],
+    include: [
+      {
+        model: TaskStatus,
+        attributes: ["taskStatusName"],
+        ...(filters?.status
+          ? {
+            where: {
+              taskStatusName: {
+                [Op.iLike]: `%${filters.status}%`
+              }
+            }
+          }
+          : {})
+      },
+      {
+        model: User,
+        attributes: ["userFirstName", "userLastName"],
+        ...(isRestrictedRole
+          ? {
+            where: {
+              userId: userLoguedId
+            }
+          }
+          : {}),
+      },
+      {
+        model: Stage,
+        attributes: ["stageName", "stageOrder"],
+        include: [
+          {
+            model: Project,
+            where: { projectId },
+            attributes: ["projectId", "projectName"],
+            include: [
+              {
+                model: ProjectStatus,
+                attributes: ["projectStatusName"]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    order: [
+      [Stage, 'stageOrder', 'ASC'],
+      [Stage, 'stageName', 'ASC'],
+      ['taskOrder', 'ASC']
+    ],
+    limit: parseInt(appConfig.ROWS_PER_PAGE),
+    offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
+  });
+  if (taskList.length == 0) {
+    //throw new NotFoundResultsError();
+    return null
+  }
+  const result = mapTasksToProjectDetailsDto(taskList);
+  return result;
 }
