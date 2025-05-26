@@ -6,7 +6,17 @@ export class EmailAlreadyExistsError extends BaseError {
         super("Hubo un error al crear el usuario. Ya existe el usuario con el correo electrónico. Inicie sesión en la plataforma o utilice otro correo para registrarse.", 409); // 409 Conflict
     }
 }
+export class ProjectWithoutStagesError extends BaseError {
+    constructor() {
+        super("El proyecto tiene etapas, pero no tiene tareas asignadas", 409); // 409 Conflict
+    }
+}
 
+export class NotFoundStagesError extends BaseError {
+    constructor() {
+        super("El proyecto no tiene etapas asignadas", 409); // 409 Conflict
+    }
+}
 
 export class UserAlreadyDeletedError extends BaseError {
     constructor() {

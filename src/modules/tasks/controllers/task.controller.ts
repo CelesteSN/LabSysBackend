@@ -1,8 +1,9 @@
 import { catchAsync } from "../../../utils/catchAsync";
 import { AllTasksDto } from "../dtos/allTask.dto";
+import { CommentFilter } from "../dtos/commentFilter.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import {  addTask, getOneTask, modifyTask, lowTask } from "../services/task.service";
+import {  addTask, getOneTask, modifyTask, lowTask, listComment } from "../services/task.service";
 import { Request, Response } from "express";
 
 
@@ -67,3 +68,36 @@ export const deleteTask = catchAsync(async (req: Request, res: Response) => {
     message: "La tarea ha sido eliminada exitosamente"
   })
 })
+
+
+export async function getAllComments(req: Request, res: Response) {
+    const { userLoguedId } = (req as any).user;
+
+    const taskId = req.params.taskId
+
+    const pageNumber = parseInt(req.query.pageNumber as string) || 0;
+
+     const filters: CommentFilter = {
+      pageNumber,
+       date: req.query.date as string| undefined,
+    //     status: req.query.status as TaskStatusEnum || undefined,
+    //     priority: req.query.priority ? parseInt(req.query.priority as string) : undefined,
+ };
+    
+    const tasks = await listComment(userLoguedId, taskId, filters);
+
+    if (tasks == null) {
+    return res.status(200).json({
+      success: true,
+      pageNumber,
+      message: 'No se encontraron comentarios asociados al proyecto.',
+      data: []
+    });
+  }
+
+    return res.status(200).json({
+        success: true,
+        pageNumber,
+        data: tasks,
+    });
+};

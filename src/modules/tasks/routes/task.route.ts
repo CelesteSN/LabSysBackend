@@ -1,5 +1,5 @@
 import { Router } from "express";
-import {  createTask, getTaskById, updateTask, deleteTask} from "../controllers/task.controller";
+import {  createTask, getTaskById, updateTask, deleteTask, getAllComments} from "../controllers/task.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { createTaskSchema } from '../schemas/createTask.schema';
@@ -15,10 +15,7 @@ export const taskRouter = Router();
 
 
 
-//userRouter.get('/roles', 
-  //  showAllRole);
-
-
+taskRouter.get('/:taskId/comments', authenticateToken,checkBlacklist, getAllComments);
 
 taskRouter.post("/", 
     authenticateToken,

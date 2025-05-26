@@ -7,7 +7,7 @@ import { ProjectTypeEnum } from "../enums/projectType.enum";
 import { ProjectType } from "../models/projectType.model";
 import { randomUUID } from "crypto";
 import { User } from "../models/user.model"
-import { ForbiddenAccessError, UserNotFoundError, NameUsedError, NotFoundResultsError, StatusNotFoundError, OrderExistsError, NotValidDatesError, StageStatusNotFound } from "../../../errors/customUserErrors";
+import { ForbiddenAccessError, UserNotFoundError, NameUsedError, NotFoundResultsError, StatusNotFoundError, OrderExistsError, NotValidDatesError, StageStatusNotFound , ProjectWithoutStagesError,NotFoundStagesError} from "../../../errors/customUserErrors";
 import { RoleEnum } from "../../users/enums/role.enum";
 import { Op } from "sequelize";
 import { ProjectFilter } from "../dtos/projectFilters.dto";
@@ -1038,6 +1038,17 @@ export async function listTask(userLoguedId: string, projectId: string, filters:
     whereConditions.taskPriority = filters.priority;
   }
 
+// Paso 1: Verificar si el proyecto tiene etapas
+const stages = await Stage.findAll({
+  where: { stageProjectId: projectId },
+  attributes: ['stageId']
+});
+
+if (stages.length === 0) {
+  throw new NotFoundStagesError();
+}
+
+
 
   const taskList = await Task.findAll({
     where: whereConditions,
@@ -1093,10 +1104,16 @@ export async function listTask(userLoguedId: string, projectId: string, filters:
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
   });
-  if (taskList.length == 0) {
-    //throw new NotFoundResultsError();
-    return null
-  }
+
+  // Verificaciones
+if (!taskList) throw new NotFoundResultsError();
+
+if (taskList.length === 0) return null;
+
+const allStagesAreNull = taskList.every(t => t.Stage === null);
+if (allStagesAreNull) {
+  throw new ProjectWithoutStagesError ();
+}
   const result = mapTasksToProjectDetailsDto(taskList);
   return result;
 }

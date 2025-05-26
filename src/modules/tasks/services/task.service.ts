@@ -7,7 +7,7 @@ import Stage from "../models/stage.model";
 import { UserStatusEnum } from "../enums/userStatus.enum";
 import ProjectUser from "../models/projectUser.model";
 import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError } from '../../../errors/customUserErrors';
-import { parse } from 'date-fns';
+import { parse, addDays } from 'date-fns';
 import { RoleEnum } from "../enums/role.enum";
 import { Op } from "sequelize";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
@@ -20,6 +20,10 @@ import { mapOneTaskToDto, OneTaskDto } from "../dtos/oneTask.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { appConfig } from "../../../config/app";
 import { Comment } from "../models/comment.model";
+import { CommentType } from "../models/commentType.model";
+import { AllCommentsDto, mapCommentToTaskDetailsDto, TaskDetailsDto } from "../dtos/allCommnet.dto";
+import { CommentFilter } from "../dtos/commentFilter.dto";
+
 
 
 
@@ -340,10 +344,10 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
     });
     if (!validStatus) { throw new StatusNotFoundError() };
 
-        updatedTask.taskTitle = taskName;
-        updatedTask.taskOrder = taskOrder;
-        updatedTask.updatedDate = new Date();
-        updatedTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date()),
+    updatedTask.taskTitle = taskName;
+    updatedTask.taskOrder = taskOrder;
+    updatedTask.updatedDate = new Date();
+    updatedTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date()),
         updatedTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
         updatedTask.taskPriority = Number(priority) || null,
         updatedTask.taskDescription = taskDescription || null,
@@ -351,8 +355,8 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
 
 
         await updatedTask.save(); // Guardar los cambios en la base de datos
-        await updateStageProgress(updatedTask.taskStageId);
-        await updateStageDates(updatedTask.taskStageId);
+    await updateStageProgress(updatedTask.taskStageId);
+    await updateStageDates(updatedTask.taskStageId);
     return updatedTask;
 }
 
@@ -367,7 +371,8 @@ export async function lowTask(userLoguedId: string, taskId: string) {
     }
 
     const deletedTask = await Task.findOne({
-        where: { taskId: taskId, 
+        where: {
+            taskId: taskId,
             taskUserId: userLoguedId
         },
         include: [
@@ -474,4 +479,84 @@ export async function updateStageProgress(stageId: string): Promise<void> {
 
     // Actualizar el progreso de la etapa
     await Stage.update({ stageProgress: progress }, { where: { stageId } });
+}
+
+
+export async function listComment(userLoguedId: string, taskId: string, filters: CommentFilter): Promise<TaskDetailsDto|null> {
+    const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
+
+ const whereConditions: any = {};
+
+  
+
+  if (filters?.date) {
+  const startDate = parse(filters.date, 'dd-MM-yyyy', new Date());
+  const endDate = addDays(startDate, 1); // día siguiente a las 00:00
+
+  whereConditions.createdDate = {
+    [Op.gte]: startDate,
+    [Op.lt]: endDate
+  };
+}
+
+    //Obtener la tarea y la valido
+    const taskExist = await Task.findOne({
+        where: { taskId: taskId },
+        include: [{
+            model: Stage,
+            include:[{
+                model: Project
+            }]
+        }],
+    });
+    if (!taskExist) { throw new NotFoundResultsError };
+
+
+    const stageAux = await taskExist.getStage();
+    const proy = await stageAux.getProject()
+
+
+     if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId) || userRole.roleName === RoleEnum.TUTOR)) {
+        throw new ForbiddenAccessError()
+    }
+  
+    //Obtengo el listado de comentarios asociados a la tarea
+    const commentList = await Comment.findAll({
+        where:whereConditions,
+        attributes: ["commentId", "createdDate", "commentDetail"],
+        include: [
+            {
+                model: CommentType,
+                attributes: ["commentTypeName"]
+            },
+            {
+                model: User,
+                attributes: ["userFirstName", "userLastName"]
+            },
+            {
+                model: Task,
+                where: {
+                    taskId: taskId,
+                    //taskUserId: userLoguedId
+                },
+                attributes: ["taskId"],
+                include: [{
+                    model: TaskStatus,
+                    attributes: ["taskStatusName"]
+
+                }]
+            }],
+        order: [['createdDate', 'DESC']],
+        limit: parseInt(appConfig.ROWS_PER_PAGE),
+        offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
+    });
+    if (commentList.length == 0) { return null }
+    const result = mapCommentToTaskDetailsDto(commentList)
+    return result;
+}
+
+
+export async function addComment(){
+
 }

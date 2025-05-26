@@ -97,7 +97,7 @@ import {
   });
 
   Comment.belongsTo(Task, {
-    foreignKey: 'comment_status_id'
+    foreignKey: 'comment_task_id'
   });
   
   Comment.belongsTo(CommentType, {
