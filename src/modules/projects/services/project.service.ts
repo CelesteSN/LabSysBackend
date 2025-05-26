@@ -7,7 +7,7 @@ import { ProjectTypeEnum } from "../enums/projectType.enum";
 import { ProjectType } from "../models/projectType.model";
 import { randomUUID } from "crypto";
 import { User } from "../models/user.model"
-import { ForbiddenAccessError, UserNotFoundError, NameUsedError, NotFoundResultsError, StatusNotFoundError, OrderExistsError, NotValidDatesError } from "../../../errors/customUserErrors";
+import { ForbiddenAccessError, UserNotFoundError, NameUsedError, NotFoundResultsError, StatusNotFoundError, OrderExistsError, NotValidDatesError, StageStatusNotFound } from "../../../errors/customUserErrors";
 import { RoleEnum } from "../../users/enums/role.enum";
 import { Op } from "sequelize";
 import { ProjectFilter } from "../dtos/projectFilters.dto";
@@ -198,7 +198,6 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
   if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
     throw new ForbiddenAccessError()
   }
-
 
   //Validar que el usuario este asignado al proyecto
   await validateProjectMembership(userLoguedId, projectId);
@@ -735,8 +734,29 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
     throw new NotFoundResultsError();
   }
 
+//Valido que el proyecto este pendiente, si ya hay alguna etapa en progreso, solo puede egregar etapas al final
 
-  //Valido que el nombre ingresado no exista
+const allStagesInProject = await Stage.findAll({
+  where:{
+    stageProjectId : projectId
+  },
+  include: [
+    {
+      model: StageStatus,
+      where:{
+        stageStatusName:{
+          [Op.or]:[StageStatusEnum.FINISHED, StageStatusEnum.INPROGRESS]
+        }
+        
+      }
+    }
+  ],
+});
+if(allStagesInProject){
+  throw new StageStatusNotFound();
+}
+
+ //Valido que el nombre ingresado no exista
   const stageExists = await Stage.findOne({
     where: {
       "stageName": stageName,
@@ -953,7 +973,8 @@ export async function getAvailableUsersForProject(userLoguedId: string, projectI
   const userRole = await userValidated.getRole();
 
   if (userRole.roleName !== RoleEnum.TUTOR) {
-    await validateProjectMembership(userLoguedId, projectId);
+    //await validateProjectMembership(userLoguedId, projectId);
+        throw new ForbiddenAccessError()
   }
   // Obtener IDs de usuarios ya asignados al proyecto
   const assignedUsers = await ProjectUser.findAll({

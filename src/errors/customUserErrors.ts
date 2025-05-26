@@ -13,6 +13,12 @@ export class UserAlreadyDeletedError extends BaseError {
         super("El usuario ya fue eliminado.", 409); // 409 Conflict
     }
 }
+export class StageStatusNotFound extends BaseError {
+    constructor() {
+        super("El proyecto ya esta en progreso o finalizado, solo puede añadir etapas al final.", 409); // 409 Conflict
+    }
+}
+
 // En tu archivo de errores personalizados
 export class ForbiddenAccessError extends Error {
     constructor(message = "No puede acceder a este recurso") {
