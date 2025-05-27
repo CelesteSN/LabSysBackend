@@ -3,7 +3,7 @@ import { AllTasksDto } from "../dtos/allTask.dto";
 import { CommentFilter } from "../dtos/commentFilter.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import {  addTask, getOneTask, modifyTask, lowTask, listComment } from "../services/task.service";
+import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment} from "../services/task.service";
 import { Request, Response } from "express";
 
 
@@ -101,3 +101,25 @@ export async function getAllComments(req: Request, res: Response) {
         data: tasks,
     });
 };
+
+
+
+export async function createComment(req: Request, res: Response) {
+    const { userLoguedId } = (req as any).user;
+
+    const taskId = req.body.taskId;
+    const commentDetail = req.body.commentDetail;
+    const commentTypeId = req.body.commentTypeId;
+    
+
+    const newComment = await addComment(userLoguedId, taskId, commentDetail, commentTypeId);
+
+    res.status(201).json({
+        success: true,
+        message: "Su comentario ha sido realizado exitosamente”. Tenga en cuenta que este puede ser modificado y/o eliminado dentro de los 60 minutos a partir de su publicación"
+    });
+
+}
+
+
+

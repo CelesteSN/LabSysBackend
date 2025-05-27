@@ -557,6 +557,86 @@ export async function listComment(userLoguedId: string, taskId: string, filters:
 }
 
 
-export async function addComment(){
+export async function addComment(userLoguedId:string, taskId: string, commentDetail: string, commentType: string){
+ const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
+
+    if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
+        throw new ForbiddenAccessError()
+    }
+
+    //Obtener la tarea y la valido
+    //Valido el proyecto ingresado
+    const validatedTask = await Task.findOne({
+        where: {
+            taskId: taskId,
+            taskUserId: userLoguedId
+        },
+        include: [
+            {
+                model: TaskStatus,
+                where: {
+                    taskStatusName:
+                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
+                },
+                attributes: ["taskStatusName"]
+            },
+            {
+                model: User,
+                where: {
+                    userId: userLoguedId
+                }
+            },
+            {
+                model: Stage,
+                attributes: ["stageName"],
+                include: [
+                    {
+                        model: StageStatus,
+                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
+                    },
+                    {
+                        model: Project,
+                        include: [
+                            {
+                                model: ProjectStatus,
+                                where: {
+                                    projectStatusName: {
+                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ],
+            }]
+    })
+
+    if (!validatedTask) { throw new NotFoundResultsError(); }
+    const stageAux = await validatedTask.getStage();
+    const proy = await stageAux.getProject()
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
+        throw new ForbiddenAccessError()
+    }
+
+    //Valido tipo de comentario ingresado
+    const commentTypeExists = await CommentType.findOne({
+        where: {
+            commentTypeId: commentType,
+        },
+    });
+    if (!commentTypeExists) { throw new StatusNotFoundError };
+
+    //creo el comment y lo asocio a la tarea
+    const newComment = await Comment.build();
+    newComment.commentDetail = commentDetail;
+    newComment.commentTypeId = commentTypeExists.commentTypeId;
+    newComment.commentTaskId = validatedTask.taskId;
+    newComment.commentUserId = userValidated.userId;
+    newComment.createdDate = new Date();
+    newComment.updatedDate = new Date();
+
+    newComment.save()
+    return
 
 }
