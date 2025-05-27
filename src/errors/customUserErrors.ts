@@ -6,13 +6,29 @@ export class EmailAlreadyExistsError extends BaseError {
         super("Hubo un error al crear el usuario. Ya existe el usuario con el correo electrónico. Inicie sesión en la plataforma o utilice otro correo para registrarse.", 409); // 409 Conflict
     }
 }
+export class ProjectWithoutStagesError extends BaseError {
+    constructor() {
+        super("El proyecto tiene etapas, pero no tiene tareas asignadas", 409); // 409 Conflict
+    }
+}
 
+export class NotFoundStagesError extends BaseError {
+    constructor() {
+        super("El proyecto no tiene etapas asignadas", 409); // 409 Conflict
+    }
+}
 
 export class UserAlreadyDeletedError extends BaseError {
     constructor() {
         super("El usuario ya fue eliminado.", 409); // 409 Conflict
     }
 }
+export class StageStatusNotFound extends BaseError {
+    constructor() {
+        super("El proyecto ya esta en progreso o finalizado, solo puede añadir etapas al final.", 409); // 409 Conflict
+    }
+}
+
 // En tu archivo de errores personalizados
 export class ForbiddenAccessError extends Error {
     constructor(message = "No puede acceder a este recurso") {
@@ -59,6 +75,14 @@ export class UserPendingError extends BaseError {
         super("La cuenta no ha sido confirmada. Recuerde que para acceder a la plataforma, su solicitud deberá ser aprobada. Se le notificará por correo electrónico cuando su solicitud sea aprobada o rechazada", 404);
     }
 }
+
+export class NotValidDatesError extends BaseError {
+    constructor(){
+        super("La fecha de finalización debe ser igual o posterior a la fecha de inicio.", 404);
+    }
+}
+
+
 
 // Otros errores iguales...
 

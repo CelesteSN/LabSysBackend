@@ -1,36 +1,12 @@
+import { catchAsync } from "../../../utils/catchAsync";
 import { AllTasksDto } from "../dtos/allTask.dto";
-import { listTask, addTask, getOneTask, modifyTask } from "../services/task.service";
+import { CommentFilter } from "../dtos/commentFilter.dto";
+import { TaskFilter } from "../dtos/taskFilters.dto";
+import { TaskStatusEnum } from "../enums/taskStatus.enum";
+import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment} from "../services/task.service";
 import { Request, Response } from "express";
 
-export async function getAllTask(req: Request, res: Response) {
-    const { userLoguedId } = (req as any).user;
 
-    const projectId = req.body.projectId
-
-    //const pageNumber = parseInt(req.query.pageNumber as string) || 0;
-
-    //   const filters: ProjectFilter = {
-    //     pageNumber,
-    //     search: req.query.search as string,
-    //     status: req.query.status as ProjectStatusEnum || undefined,
-    //   };
-    const tasks = await listTask(userLoguedId, projectId);
-
-    if (tasks.tasks.length === 0) {
-        return res.status(200).json({
-            success: true,
-            //pageNumber,
-            message: 'No se encontraron resultados',
-            data: []
-        });
-    }
-
-    return res.status(200).json({
-        success: true,
-        //pageNumber,
-        data: tasks,
-    });
-};
 
 
 export async function createTask(req: Request, res: Response) {
@@ -61,23 +37,89 @@ export async function getTaskById(req: Request, res: Response) {
         success: true,
         data: task
     });
-} 
+}
 
-export async function updateTask(req: Request, res: Response){
-     const { userLoguedId } = (req as any).user;
+export async function updateTask(req: Request, res: Response) {
+    const { userLoguedId } = (req as any).user;
     const taskId = req.params.taskId;
     const taskName = req.body.taskName;
     const taskOrder = req.body.taskOrder;
     const taskStartDate = req.body.taskStartDate;
     const taskEndDate = req.body.taskEndDate;
     const taskDescription = req.body.taskDescription;
-    const taskStatus = req.body.taskStatus;
+    const taskStatusId = req.body.taskStatusId;
     const priority = req.body.priority;
 
-await modifyTask(userLoguedId, taskId , taskName , taskOrder , taskStartDate , taskEndDate , taskStatus , taskDescription, priority);
- res.status(200).json({
-    success: true,
-    message: "El proyecto ha sido modificado exitosamente"
-  })
+    await modifyTask(userLoguedId, taskId, taskName, taskOrder, taskStartDate, taskEndDate, taskStatusId, taskDescription, priority);
+    res.status(200).json({
+        success: true,
+        message: "La tarea ha sido modificada exitosamente"
+    })
 
 }
+
+
+export const deleteTask = catchAsync(async (req: Request, res: Response) => {
+  const taskId = req.params.taskId;
+  const { userLoguedId } = (req as any).user;
+  await lowTask(userLoguedId, taskId);
+  res.status(200).json({
+    success: true,
+    message: "La tarea ha sido eliminada exitosamente"
+  })
+})
+
+
+export async function getAllComments(req: Request, res: Response) {
+    const { userLoguedId } = (req as any).user;
+
+    const taskId = req.params.taskId
+
+    const pageNumber = parseInt(req.query.pageNumber as string) || 0;
+
+     const filters: CommentFilter = {
+      pageNumber,
+       date: req.query.date as string| undefined,
+    //     status: req.query.status as TaskStatusEnum || undefined,
+    //     priority: req.query.priority ? parseInt(req.query.priority as string) : undefined,
+ };
+    
+    const tasks = await listComment(userLoguedId, taskId, filters);
+
+    if (tasks == null) {
+    return res.status(200).json({
+      success: true,
+      pageNumber,
+      message: 'No se encontraron comentarios asociados al proyecto.',
+      data: []
+    });
+  }
+
+    return res.status(200).json({
+        success: true,
+        pageNumber,
+        data: tasks,
+    });
+};
+
+
+
+export async function createComment(req: Request, res: Response) {
+    const { userLoguedId } = (req as any).user;
+
+    const taskId = req.body.taskId;
+    const commentDetail = req.body.commentDetail;
+    const commentTypeId = req.body.commentTypeId;
+    
+
+    const newComment = await addComment(userLoguedId, taskId, commentDetail, commentTypeId);
+
+    res.status(201).json({
+        success: true,
+        message: "Su comentario ha sido realizado exitosamente”. Tenga en cuenta que este puede ser modificado y/o eliminado dentro de los 60 minutos a partir de su publicación"
+    });
+
+}
+
+
+
