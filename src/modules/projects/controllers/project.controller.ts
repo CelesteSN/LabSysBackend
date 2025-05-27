@@ -295,7 +295,7 @@ export async function getAllTask(req: Request, res: Response) {
     if (tasks == null) {
     return res.status(200).json({
       success: true,
-      message: 'No se encontraron etapas asociadas al proyecto.',
+      message: 'No se encontraron resultados.',
       data: []
     });
   }
@@ -306,3 +306,5 @@ export async function getAllTask(req: Request, res: Response) {
         data: tasks,
     });
 };
+
+

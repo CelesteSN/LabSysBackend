@@ -9,13 +9,14 @@ import { updateProjectSchema } from "../validations/updateProject.validation";
 import {addMembersSchema} from "../validations/addMembers.validation";
 import {deleteMemberSchema} from "../validations/deleteMember.validation";
 import {stageSchema} from "../validations/createStage.schema";
+import {AllTaskFiltersSchema} from "../validations/allTaskFilters.schema";
 
 
 
 export const projectRouter = Router();
 // 🟢 Rutas más específicas van primero
 // 🔵 Luego las más generales
-projectRouter.get('/:projectId/tasks', authenticateToken, checkBlacklist, getAllTask);
+projectRouter.get('/:projectId/tasks', authenticateToken, checkBlacklist, validateRequest({query: AllTaskFiltersSchema}), getAllTask);
 
 //tipo de proyectos
 

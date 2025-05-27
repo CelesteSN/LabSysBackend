@@ -29,6 +29,12 @@ export class StageStatusNotFound extends BaseError {
     }
 }
 
+
+export class NotModifiOrDeleteCommentError extends BaseError {
+    constructor() {
+        super("No es posible modificar o eliminar el comentario porque ha pasado más de 60 minutos a partir de su publicación.", 409); // 409 Conflict
+    }
+}
 // En tu archivo de errores personalizados
 export class ForbiddenAccessError extends Error {
     constructor(message = "No puede acceder a este recurso") {
