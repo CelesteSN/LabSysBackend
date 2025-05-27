@@ -13,23 +13,23 @@ export const updateProjectSchema = Joi.object({
     }),
 
   description: Joi.string()
+    .allow('') // permite string vacío
     .min(3)
     .max(255)
-    .required()
+    .optional()
     .messages({
       "string.base": "La descripción debe ser un texto.",
-      "string.empty": "El campo descripción es obligatorio.",
       "string.min": "La descripción debe tener al menos 3 caracteres.",
       "string.max": "La descripción no puede tener más de 255 caracteres.",
     }),
 
   objetive: Joi.string()
+    .allow('') // permite string vacío
     .min(3)
     .max(255)
-    .required()
+    .optional()
     .messages({
       "string.base": "El objetivo debe ser un texto.",
-      "string.empty": "El campo objetivo es obligatorio.",
       "string.min": "El objetivo debe tener al menos 3 caracteres.",
       "string.max": "El objetivo no puede tener más de 255 caracteres.",
     }),

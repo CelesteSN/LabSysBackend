@@ -1,7 +1,7 @@
 import { Task } from "../models/task.model";
 import { format } from 'date-fns';
 
-export type ProjectDetailsDto = {
+export type ProjectDetails1Dto = {
   projectId: string;
   // projectName: string;
   // description?: string | '';
@@ -24,7 +24,7 @@ export type AllTasksDto = {
   owner: string;
 };
 
-export function mapTasksToProjectDetailsDto(tasks: Task[]): ProjectDetailsDto {
+export function mapTasksToProjectDetailsDto(tasks: Task[]): ProjectDetails1Dto {
   
 
   const firstTask = tasks[0];

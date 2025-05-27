@@ -7,7 +7,7 @@ import Stage from "../models/stage.model";
 import { UserStatusEnum } from "../enums/userStatus.enum";
 import ProjectUser from "../models/projectUser.model";
 import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError } from '../../../errors/customUserErrors';
-import { parse } from 'date-fns';
+import { parse, addDays } from 'date-fns';
 import { RoleEnum } from "../enums/role.enum";
 import { Op } from "sequelize";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
@@ -17,103 +17,18 @@ import { ProjectStatusEnum } from "../../projects/enums/projectStatus.enum";
 import { StageStatus } from "../models/stageStatus.model";
 import { StageStatusEnum } from "../../projects/enums/stageStatus.enum";
 import { mapOneTaskToDto, OneTaskDto } from "../dtos/oneTask.dto";
+import { TaskFilter } from "../dtos/taskFilters.dto";
+import { appConfig } from "../../../config/app";
+import { Comment } from "../models/comment.model";
+import { CommentType } from "../models/commentType.model";
+import { AllCommentsDto, mapCommentToTaskDetailsDto, TaskDetailsDto } from "../dtos/allCommnet.dto";
+import { CommentFilter } from "../dtos/commentFilter.dto";
 
 
 
 
-//export async function listTask(userLoguedId: string, filters: taskFilters): Promise<AllTasksDto[]> {
-export async function listTask(userLoguedId: string, projectId: string): Promise<ProjectDetailsDto> {
-    const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
 
 
-    const taskList = await Task.findAll({
-        attributes: ["taskId", "taskTitle", "taskOrder", "taskPriority", "taskStartDate", "taskEndDate"],
-        include: [
-            {
-                model: TaskStatus,
-                attributes: ["taskStatusName"]
-            },
-            {
-                model: User,
-                attributes: ["userFirstName", "userLastName"]
-            },
-            {
-                model: Stage,
-                attributes: ["stageName", "stageOrder"],
-                include: [
-                    {
-                        model: Project,
-                        where: { projectId },
-                        attributes: ["projectId", "projectName"],
-                        include: [
-                            {
-                                model: ProjectStatus,
-                                attributes: ["projectStatusName"] // Corrige aquí el nombre
-                            }
-                        ]
-                    }
-                ]
-            }
-        ],
-        order: [
-            [Stage, 'stageOrder', 'ASC'],
-            [Stage, 'stageName', 'ASC'],
-            ['taskOrder', 'ASC']
-        ]
-    });
-    const result = mapTasksToProjectDetailsDto(taskList);
-
-    return result;
-
-    //   const whereConditions: any = {};
-
-    //   const statusRaw = filters?.status?.trim();
-    //   const status = statusRaw ?? ProjectStatusEnum.INPROGRESS;
-    //   const isStatusAll = status.toLowerCase() === ProjectStatusEnum.ALL.toLowerCase();
-
-    //   if (filters?.search) {
-    //     whereConditions[Op.or] = [
-    //       { projectName: { [Op.iLike]: `%${filters.search}%` } }, // corregido el typo
-    //     ];
-    //   }
-
-    //   // Configuración base del query
-    //   const baseQuery: any = {
-    //     where: whereConditions,
-    //     attributes: ['projectId', 'projectName', 'projectStartDate', 'projectEndDate', 'createdDate'],
-    //     include: [],
-    //     order: [["createdDate", "ASC"]],
-    //     limit: parseInt(appConfig.ROWS_PER_PAGE),
-    //     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-    //   };
-
-    //   // Filtro por estado del proyecto
-    //   const statusInclude = {
-    //     model: TaskStatus,
-    //     attributes: ['projectStatusName'],
-    //     ...(isStatusAll ? {} : { where: { projectStatusName: status } })
-    //   };
-
-    //   // Condicional por rol
-    //   if (userRole.roleName === RoleEnum.TUTOR) {
-    //     baseQuery.include.push(statusInclude);
-    //   } else if (RoleEnum.BECARIO === userRole.roleName || userRole.roleName === RoleEnum.PASANTE) {
-    //     baseQuery.include.push(
-    //       {
-    //         model: ProjectUser,
-    //         as: "projectUsers",
-    //         where: {
-    //           projectUserUserId: userValidated.userId
-    //         }
-    //       },
-    //       statusInclude
-    //     );
-    //   }
-
-    //   const projects = await Project.findAll(baseQuery);
-    //   return projects.map(mapProjectToDto);
-}
 
 
 export async function addTask(userLoguedId: string, stageId: string, taskName: string, taskOrder: number, taskStartDate: string, taskEndDate: string, taskDescription?: string, priority?: number) {
@@ -200,12 +115,10 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
     // console.log(status?.userStatusName)
     if (!statusPending) {
         throw new StatusNotFoundError();
-
     }
 
-
     const newTask = await Task.build();
-        newTask.taskTitle = taskName,
+    newTask.taskTitle = taskName,
         newTask.taskDescription = taskDescription || null,
         newTask.taskOrder = Number(taskOrder),
         newTask.taskPriority = Number(priority) || null,
@@ -217,11 +130,56 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
         newTask.taskStatusId = statusPending.taskStatusId,
         newTask.taskUserId = userValidated.userId
 
+    await updateStageProgress(newTask.taskStageId);
+    await updateStageDates(newTask.taskStageId);
 
     await newTask.save();
     return
 }
 
+
+
+export async function updateStageDates(stageId: string): Promise<void> {
+    // Obtener todas las tareas de la etapa
+    const tasks = await Task.findAll({
+        where: {
+            taskStageId: stageId
+        },
+        attributes: ["taskStartDate", "taskEndDate"]
+    });
+
+    if (tasks.length === 0) {
+        // Si no hay tareas, limpiar fechas
+        await Stage.update(
+            {
+                stageStartDate: null,
+                stageEndDate: null
+            },
+            {
+                where: { stageId }
+            }
+        );
+        return;
+    }
+
+    // Obtener fechas mínimas y máximas
+    const startDates = tasks.map(t => t.taskStartDate).filter(Boolean) as Date[];
+    const endDates = tasks.map(t => t.taskEndDate).filter(Boolean) as Date[];
+
+    const minStartDate = startDates.length ? new Date(Math.min(...startDates.map(d => d.getTime()))) : null;
+    const maxEndDate = endDates.length ? new Date(Math.max(...endDates.map(d => d.getTime()))) : null;
+
+    // Actualizar etapa
+    await Stage.update(
+        {
+            stageStartDate: minStartDate,
+            stageEndDate: maxEndDate
+        },
+        {
+            where: { stageId }
+        }
+    );
+}
 
 export async function getOneTask(userLoguedId: string, taskId: string): Promise<OneTaskDto> {
 
@@ -229,6 +187,7 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
     const userRole = await userValidated.getRole();
 
     const isRestrictedRole = [RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum);
+
 
     const task = await Task.findOne({
         where: {
@@ -275,7 +234,8 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
                         ]
                     }
                 ],
-            }]
+            }
+        ]
     })
 
     if (!task) { throw new NotFoundResultsError(); }
@@ -304,7 +264,8 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
     //Valido el proyecto ingresado
     const updatedTask = await Task.findOne({
         where: {
-            taskId: taskId
+            taskId: taskId,
+            taskUserId: userLoguedId
         },
         include: [
             {
@@ -317,9 +278,9 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
             },
             {
                 model: User,
-                        where: {
-                            userId: userLoguedId
-                        }
+                where: {
+                    userId: userLoguedId
+                }
             },
             {
                 model: Stage,
@@ -349,19 +310,16 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
     if (!updatedTask) { throw new NotFoundResultsError(); }
     const stageAux = await updatedTask.getStage();
     const proy = await stageAux.getProject()
-    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId) )) {
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
         throw new ForbiddenAccessError()
     }
-
-
-
 
     //Valido que el nombre ingresado no exista
     const taskNameExists = await Task.findOne({
         where: {
-            taskName: taskName,
+            taskTitle: taskName,
             taskStageId: stageAux.stageId,
-            stageId: { [Op.ne]: taskId } // excluye la etapa actual
+            taskId: { [Op.ne]: taskId } // excluye la etapa actual
         },
     });
     if (taskNameExists) { throw new NameUsedError() };
@@ -370,7 +328,7 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
     //valido el orden
     const orderExist = await Task.findOne({
         where: {
-            "taskOrder": taskOrder,
+            taskOrder: taskOrder,
             taskStageId: stageAux.stageId,
             taskId: { [Op.ne]: taskId } // excluye la etapa actual
 
@@ -380,8 +338,8 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
 
     //valido el status
     const validStatus = await TaskStatus.findOne({
-        where:{
-            taskStatusName : taskStatus
+        where: {
+            taskStatusId: taskStatus
         }
     });
     if (!validStatus) { throw new StatusNotFoundError() };
@@ -390,19 +348,17 @@ export async function modifyTask(userLoguedId: string, taskId: string, taskName:
     updatedTask.taskOrder = taskOrder;
     updatedTask.updatedDate = new Date();
     updatedTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date()),
-    updatedTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
-    updatedTask.taskPriority = Number(priority) || null,
-    updatedTask.taskDescription = taskDescription || null,
-    updatedTask.taskStatusId = validStatus.taskStatusId,
+        updatedTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
+        updatedTask.taskPriority = Number(priority) || null,
+        updatedTask.taskDescription = taskDescription || null,
+        updatedTask.taskStatusId = validStatus.taskStatusId,
 
 
-    await updatedTask.save(); // Guardar los cambios en la base de datos
-
+        await updatedTask.save(); // Guardar los cambios en la base de datos
+    await updateStageProgress(updatedTask.taskStageId);
+    await updateStageDates(updatedTask.taskStageId);
     return updatedTask;
 }
-
-
-
 
 
 export async function lowTask(userLoguedId: string, taskId: string) {
@@ -415,7 +371,10 @@ export async function lowTask(userLoguedId: string, taskId: string) {
     }
 
     const deletedTask = await Task.findOne({
-        where: { "taskId": taskId },
+        where: {
+            taskId: taskId,
+            taskUserId: userLoguedId
+        },
         include: [
             {
                 model: TaskStatus,
@@ -441,7 +400,9 @@ export async function lowTask(userLoguedId: string, taskId: string) {
     await validateProjectMembership(userLoguedId, stageProject.projectId);
 
     deletedTask.destroy();
-
+    await updateStageProgress(deletedTask.taskStageId);
+    await updateStageDates(deletedTask.taskStageId);
+    return
 }
 
 //Función para validar si existe el usuario y si esta en estado activo
@@ -490,3 +451,192 @@ export async function validateProjectMembershipWhitReturn(userId: string, projec
 }
 
 
+
+export async function updateStageProgress(stageId: string): Promise<void> {
+    // Traer todas las tareas de la etapa
+    const tasks = await Task.findAll({
+        where: { taskStageId: stageId },
+        include: [
+            {
+                model: TaskStatus,
+                attributes: ["taskStatusName"]
+            }
+        ]
+    });
+
+    const totalTasks = tasks.length;
+    if (totalTasks === 0) {
+        await Stage.update({ stageProgress: 0 }, { where: { stageId } });
+        return;
+    }
+
+    // Contar las tareas finalizadas
+    const completedTasks = tasks.filter(task =>
+        task.TaskStatus?.taskStatusName?.toUpperCase() === "FINALIZADA"
+    ).length;
+
+    const progress = Math.round((completedTasks / totalTasks) * 100);
+
+    // Actualizar el progreso de la etapa
+    await Stage.update({ stageProgress: progress }, { where: { stageId } });
+}
+
+
+export async function listComment(userLoguedId: string, taskId: string, filters: CommentFilter): Promise<TaskDetailsDto|null> {
+    const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
+
+ const whereConditions: any = {};
+
+  
+
+  if (filters?.date) {
+  const startDate = parse(filters.date, 'dd-MM-yyyy', new Date());
+  const endDate = addDays(startDate, 1); // día siguiente a las 00:00
+
+  whereConditions.createdDate = {
+    [Op.gte]: startDate,
+    [Op.lt]: endDate
+  };
+}
+
+    //Obtener la tarea y la valido
+    const taskExist = await Task.findOne({
+        where: { taskId: taskId },
+        include: [{
+            model: Stage,
+            include:[{
+                model: Project
+            }]
+        }],
+    });
+    if (!taskExist) { throw new NotFoundResultsError };
+
+
+    const stageAux = await taskExist.getStage();
+    const proy = await stageAux.getProject()
+
+
+     if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId) || userRole.roleName === RoleEnum.TUTOR)) {
+        throw new ForbiddenAccessError()
+    }
+  
+    //Obtengo el listado de comentarios asociados a la tarea
+    const commentList = await Comment.findAll({
+        where:whereConditions,
+        attributes: ["commentId", "createdDate", "commentDetail"],
+        include: [
+            {
+                model: CommentType,
+                attributes: ["commentTypeName"]
+            },
+            {
+                model: User,
+                attributes: ["userFirstName", "userLastName"]
+            },
+            {
+                model: Task,
+                where: {
+                    taskId: taskId,
+                    //taskUserId: userLoguedId
+                },
+                attributes: ["taskId"],
+                include: [{
+                    model: TaskStatus,
+                    attributes: ["taskStatusName"]
+
+                }]
+            }],
+        order: [['createdDate', 'DESC']],
+        limit: parseInt(appConfig.ROWS_PER_PAGE),
+        offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
+    });
+    if (commentList.length == 0) { return null }
+    const result = mapCommentToTaskDetailsDto(commentList)
+    return result;
+}
+
+
+export async function addComment(userLoguedId:string, taskId: string, commentDetail: string, commentType: string){
+ const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
+
+    if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
+        throw new ForbiddenAccessError()
+    }
+
+    //Obtener la tarea y la valido
+    //Valido el proyecto ingresado
+    const validatedTask = await Task.findOne({
+        where: {
+            taskId: taskId,
+            taskUserId: userLoguedId
+        },
+        include: [
+            {
+                model: TaskStatus,
+                where: {
+                    taskStatusName:
+                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
+                },
+                attributes: ["taskStatusName"]
+            },
+            {
+                model: User,
+                where: {
+                    userId: userLoguedId
+                }
+            },
+            {
+                model: Stage,
+                attributes: ["stageName"],
+                include: [
+                    {
+                        model: StageStatus,
+                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
+                    },
+                    {
+                        model: Project,
+                        include: [
+                            {
+                                model: ProjectStatus,
+                                where: {
+                                    projectStatusName: {
+                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ],
+            }]
+    })
+
+    if (!validatedTask) { throw new NotFoundResultsError(); }
+    const stageAux = await validatedTask.getStage();
+    const proy = await stageAux.getProject()
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
+        throw new ForbiddenAccessError()
+    }
+
+    //Valido tipo de comentario ingresado
+    const commentTypeExists = await CommentType.findOne({
+        where: {
+            commentTypeId: commentType,
+        },
+    });
+    if (!commentTypeExists) { throw new StatusNotFoundError };
+
+    //creo el comment y lo asocio a la tarea
+    const newComment = await Comment.build();
+    newComment.commentDetail = commentDetail;
+    newComment.commentTypeId = commentTypeExists.commentTypeId;
+    newComment.commentTaskId = validatedTask.taskId;
+    newComment.commentUserId = userValidated.userId;
+    newComment.createdDate = new Date();
+    newComment.updatedDate = new Date();
+
+    newComment.save()
+    return
+
+}

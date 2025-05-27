@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAllTask, createTask, getTaskById, updateTask} from "../controllers/task.controller";
+import {  createTask, getTaskById, updateTask, deleteTask, getAllComments, createComment} from "../controllers/task.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { createTaskSchema } from '../schemas/createTask.schema';
@@ -13,28 +13,22 @@ import { updateTaskSchema } from "../schemas/updateTask.schema";
 
 export const taskRouter = Router();
 
+//Rutas de comentario
+taskRouter.post("/comments", 
+    authenticateToken, checkBlacklist,
+    //validateRequest({ body: createTaskSchema }), 
+    createComment);
+taskRouter.get('/:taskId/comments', authenticateToken,checkBlacklist, getAllComments);
 
 
-//userRouter.get('/roles', 
-  //  showAllRole);
-
-taskRouter.get("/", 
-    authenticateToken, 
-    checkBlacklist, 
-    //validateRequest({ query: searchValidation }), 
-    getAllTask);
-
+    //Rutas de tareas
 taskRouter.post("/", 
     authenticateToken,
     validateRequest({ body: createTaskSchema }), 
     createTask);
 
 // 🟢 Rutas más específicas van primero
-// userRouter.put("/:id/answer", 
-//     authenticateToken, 
-//     checkBlacklist, 
-//     validateRequest({ body: responseUserValidate }), 
-//     answerUser);
+
 
 // // 🔵 Luego las más generales
 taskRouter.get("/:taskId", 
@@ -42,13 +36,13 @@ taskRouter.get("/:taskId",
   checkBlacklist, 
   getTaskById);
 
-taskRouter.put("/:id", 
+taskRouter.put("/:taskId", 
    authenticateToken, 
   checkBlacklist, 
   validateRequest({ body: updateTaskSchema }), 
   updateTask);
 
-// userRouter.delete("/:id", 
-//     authenticateToken, 
-//     checkBlacklist, 
-//     deleteUser);
+taskRouter.delete("/:taskId", 
+    authenticateToken, 
+    checkBlacklist, 
+    deleteTask);

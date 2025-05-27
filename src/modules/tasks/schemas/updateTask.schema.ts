@@ -1,15 +1,15 @@
 import Joi from 'joi';
 
 export const updateTaskSchema = Joi.object({
-  stageId: Joi.string()
-    .uuid()
-    .required()
-    .messages({
-      'any.required': 'El campo etapa es obligatorio.',
-      'string.guid': 'El ID de la etapa no es válido.',
-      'string.empty': 'El campo etapa no puede estar vacío.',
+  // stageId: Joi.string()
+  //   .uuid()
+  //   .required()
+  //   .messages({
+  //     'any.required': 'El campo etapa es obligatorio.',
+  //     'string.guid': 'El ID de la etapa no es válido.',
+  //     'string.empty': 'El campo etapa no puede estar vacío.',
 
-    }),
+  //   }),
 
   // userId: Joi.string()
   //   .uuid()
