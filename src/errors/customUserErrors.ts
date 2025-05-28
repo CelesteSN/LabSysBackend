@@ -18,6 +18,20 @@ export class NotFoundStagesError extends BaseError {
     }
 }
 
+export class BadRequestStartDateStageError extends BaseError {
+    constructor() {
+        super("La fecha de inicio de la etapa no puede ser anterior a la fecha de inicio del proyecto.", 409); // 409 Conflict
+    }
+}
+
+export class BadRequestEndDateStageError extends BaseError {
+    constructor() {
+        super("La fecha de finalización de la etapa no puede ser posterior a la fecha de fin del proyecto.", 409); // 409 Conflict
+    }
+}
+
+
+
 export class UserAlreadyDeletedError extends BaseError {
     constructor() {
         super("El usuario ya fue eliminado.", 409); // 409 Conflict
@@ -58,6 +72,13 @@ export class UserNotFoundError extends BaseError {
         super("Usuario no encontrado", 404);
     }
 }
+
+export class BadRequestError extends BaseError {
+    constructor(){
+        super("Usuario no encontrado", 404);
+    }
+}
+
 export class NameUsedError extends BaseError {
     constructor(){
         super("El nombre ya esta en uso", 404);

@@ -53,9 +53,9 @@ export const createTaskSchema = Joi.object({
     }),
 
   taskPriority: Joi.number()
-    .valid(1, 2, 3)
+    .valid(0, 1, 2, 3)
     .messages({
-      'any.only': 'La prioridad debe ser 1 (baja), 2 (media) o 3 (alta).',
+      'any.only': 'La prioridad debe ser 0 (baja), 1 (media), 2 (alta) o 3 (urgente).',
       'any.required': 'La prioridad es obligatoria.'
     }),
 

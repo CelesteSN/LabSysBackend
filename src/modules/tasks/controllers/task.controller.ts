@@ -3,7 +3,7 @@ import { AllTasksDto } from "../dtos/allTask.dto";
 import { CommentFilter } from "../dtos/commentFilter.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment} from "../services/task.service";
+import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment, getOneComment} from "../services/task.service";
 import { Request, Response } from "express";
 
 
@@ -24,7 +24,7 @@ export async function createTask(req: Request, res: Response) {
 
     res.status(201).json({
         success: true,
-        message: "La tarea ha sido creado exitosamente."
+        message: "La tarea ha sido creada exitosamente."
     });
 
 }
@@ -146,3 +146,14 @@ export const deleteComment = catchAsync(async (req: Request, res: Response) => {
     message: "El comentario ha sido eliminado exitosamente"
   })
 })
+
+
+export async function getCommentById(req: Request, res: Response) {
+    const { userLoguedId } = (req as any).user;
+    const commentId = req.params.commentId
+    const comment = await getOneComment(userLoguedId, commentId);
+    res.status(200).json({
+        success: true,
+        data: comment
+    });
+}

@@ -6,7 +6,7 @@ import { User } from "../models/user.model";
 import Stage from "../models/stage.model";
 import { UserStatusEnum } from "../enums/userStatus.enum";
 import ProjectUser from "../models/projectUser.model";
-import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError, NotModifiOrDeleteCommentError } from '../../../errors/customUserErrors';
+import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError, NotModifiOrDeleteCommentError, BadRequestStartDateStageError, BadRequestEndDateStageError } from '../../../errors/customUserErrors';
 import { parse, addDays } from 'date-fns';
 import { RoleEnum } from "../enums/role.enum";
 import { Op } from "sequelize";
@@ -23,6 +23,7 @@ import { Comment } from "../models/comment.model";
 import { CommentType } from "../models/commentType.model";
 import { AllCommentsDto, mapCommentToTaskDetailsDto, TaskDetailsDto } from "../dtos/allCommnet.dto";
 import { CommentFilter } from "../dtos/commentFilter.dto";
+import { mapOneCommentToDto } from "../dtos/oneComment.dto";
 
 
 
@@ -45,7 +46,8 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
         include: [
             {
                 model: StageStatus,
-                where: { "stageStatusName": { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
+                where: { "stageStatusName": { [Op.or]: [//StageStatusEnum.INPROGRESS, 
+                    StageStatusEnum.PENDING] } }
             },
             {
                 model: Project,
@@ -68,26 +70,7 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
     //Validar que este asignado al proyecto
     await validateProjectMembership(userLoguedId, pro.projectId);
 
-    //Valido el proyecto ingresado
-    // const project = await Project.findOne({
-    //     where: { "projectStageId": stageId },
-    //     include: [
-    //         {
-    //             model: ProjectStatus,
-    //             where: {
-    //                 projectStatusName: {
-    //                     [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-    //                 }
-    //             },
-    //         },
-    //     ]
-    // });
-
-    // if (!project) {
-    //     throw new NotFoundResultsError();
-    // }
-
-
+    
     //Valido que el nombre ingresado no exista
     const taskExists = await Task.findOne({
         where: {
@@ -106,7 +89,7 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
     })
     if (orderExist) { throw new OrderExistsError() };
 
-    //obtengo el estado pendiente
+    //obtengo el estado pendiente para la nueva tarea
     let statusPending = await TaskStatus.findOne({
         where: {
             taskStatusName: TaskStatusEnum.PENDING
@@ -129,35 +112,44 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
         newTask.taskStageId = stage1.stageId,
         newTask.taskStatusId = statusPending.taskStatusId,
         newTask.taskUserId = userValidated.userId
+    await newTask.save();
 
     await updateStageProgress(newTask.taskStageId);
     await updateStageDates(newTask.taskStageId);
 
-    await newTask.save();
     return
 }
 
 
-
 export async function updateStageDates(stageId: string): Promise<void> {
+    // Obtener la etapa con su proyecto
+    const stage = await Stage.findByPk(stageId, {
+        include: [{
+            model: Project,
+            attributes: ["projectStartDate", "projectEndDate"]
+        }]
+    });
+
+    if (!stage || !stage.Project) {
+        throw new Error("No se encontró la etapa o el proyecto asociado.");
+    }
+
+    const projectStart = stage.Project.projectStartDate;
+    const projectEnd = stage.Project.projectEndDate;
+
     // Obtener todas las tareas de la etapa
     const tasks = await Task.findAll({
-        where: {
-            taskStageId: stageId
-        },
+        where: { taskStageId: stageId },
         attributes: ["taskStartDate", "taskEndDate"]
     });
 
     if (tasks.length === 0) {
-        // Si no hay tareas, limpiar fechas
         await Stage.update(
             {
                 stageStartDate: null,
                 stageEndDate: null
             },
-            {
-                where: { stageId }
-            }
+            { where: { stageId } }
         );
         return;
     }
@@ -169,17 +161,67 @@ export async function updateStageDates(stageId: string): Promise<void> {
     const minStartDate = startDates.length ? new Date(Math.min(...startDates.map(d => d.getTime()))) : null;
     const maxEndDate = endDates.length ? new Date(Math.max(...endDates.map(d => d.getTime()))) : null;
 
+    // Validar límites del proyecto
+    if (minStartDate && projectStart && minStartDate < projectStart) {
+        throw new BadRequestStartDateStageError();
+    }
+
+    if (maxEndDate && projectEnd && maxEndDate > projectEnd) {
+        throw new BadRequestEndDateStageError();
+    }
+
     // Actualizar etapa
     await Stage.update(
         {
             stageStartDate: minStartDate,
             stageEndDate: maxEndDate
         },
-        {
-            where: { stageId }
-        }
+        { where: { stageId } }
     );
 }
+
+
+// export async function updateStageDates(stageId: string): Promise<void> {
+//     // Obtener todas las tareas de la etapa
+//     const tasks = await Task.findAll({
+//         where: {
+//             taskStageId: stageId
+//         },
+//         attributes: ["taskStartDate", "taskEndDate"]
+//     });
+
+//     if (tasks.length === 0) {
+//         // Si no hay tareas, limpiar fechas
+//         await Stage.update(
+//             {
+//                 stageStartDate: null,
+//                 stageEndDate: null
+//             },
+//             {
+//                 where: { stageId }
+//             }
+//         );
+//         return;
+//     }
+
+//     // Obtener fechas mínimas y máximas
+//     const startDates = tasks.map(t => t.taskStartDate).filter(Boolean) as Date[];
+//     const endDates = tasks.map(t => t.taskEndDate).filter(Boolean) as Date[];
+
+//     const minStartDate = startDates.length ? new Date(Math.min(...startDates.map(d => d.getTime()))) : null;
+//     const maxEndDate = endDates.length ? new Date(Math.max(...endDates.map(d => d.getTime()))) : null;
+
+//     // Actualizar etapa
+//     await Stage.update(
+//         {
+//             stageStartDate: minStartDate,
+//             stageEndDate: maxEndDate
+//         },
+//         {
+//             where: { stageId }
+//         }
+//     );
+// }
 
 export async function getOneTask(userLoguedId: string, taskId: string): Promise<OneTaskDto> {
 
@@ -398,7 +440,12 @@ export async function lowTask(userLoguedId: string, taskId: string) {
 
     //Validar que este asignado al proyecto
     await validateProjectMembership(userLoguedId, stageProject.projectId);
-
+ //Elimino todas las tareas asociadas
+    await Comment.destroy({
+    where:{
+    commentTaskId : deletedTask.taskId
+}
+  })
     deletedTask.destroy();
     await updateStageProgress(deletedTask.taskStageId);
     await updateStageDates(deletedTask.taskStageId);
@@ -809,3 +856,72 @@ export async function lowComment(userLoguedId: string, commentId: string){
 deleteComment.destroy();
 return
 }
+
+export async function getOneComment(userLoguedId: string, commentId: string){
+    const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
+
+    const isRestrictedRole = [RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum);
+
+
+    const comment = await Comment.findOne({
+        where: {
+            commentId: commentId
+        },
+        include: [
+            {model: Task,
+            include:[{
+                model: TaskStatus,
+                where: {
+                    taskStatusName:
+                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
+                },
+                attributes: ["taskStatusName"]},   
+                        {
+                model: User,
+                ...(isRestrictedRole
+                    ? {
+                        where: {
+                            userId: userLoguedId
+                        }
+                    }
+                    : {}),
+                    },
+                    {
+                model: Stage,
+                attributes: ["stageName"],
+                include: [
+                    {
+                        model: StageStatus,
+                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
+                    },
+                    {
+                        model: Project,
+                        include: [
+                            {
+                                model: ProjectStatus,
+                                where: {
+                                    projectStatusName: {
+                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                ],
+            }]
+    }]
+    })
+
+    if (!comment) { throw new NotFoundResultsError(); }
+    const taskAux = await comment.getTask();
+    const stageAux = await taskAux.getStage();
+    const pro = await stageAux.getProject()
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, pro.projectId) || userRole.roleName === RoleEnum.TUTOR)) {
+        throw new ForbiddenAccessError()
+    }
+    const result = mapOneCommentToDto(comment)
+
+    return result
+}
+

@@ -1023,22 +1023,15 @@ export async function lowStage(userLoguedId: string, stageId: string) {
   //Validar que este asignado al proyecto
   await validateProjectMembership(userLoguedId, projectStage.projectId);
 
+  //Elimino todas las tareas asociadas
+ await Task.destroy({
+  where:{
+    taskStageId : deletedStage.stageId
+
+}
+  })
   deletedStage.destroy();
-  //ELIMINAR TODAS LAS TAREAS ASOCIADAS
-  // //Buscar el estado Dado de baja
-  // const statusLow = await ProjectStatus.findOne({
-  //   where: {
-  //     'projectStatusName': ProjectStatusEnum.LOW
-  //   }
-  // }
-  // );
-
-  // if (!statusLow) { throw new StatusNotFoundError() };
-
-
-  // deletedproject.setProjectStatus(statusLow.projectStatusId)
-  // deletedproject.deletedDate = new Date(); // Eliminar el usuario de la base de datos
-  // await deletedproject.save();
+  
   return
 
 }
@@ -1130,7 +1123,8 @@ const stages = await Stage.findAll({
 });
 
 if (stages.length === 0) {
-  throw new NotFoundStagesError();
+  //throw new NotFoundStagesError();
+  return null;
 }
 
 
@@ -1165,6 +1159,8 @@ if (stages.length === 0) {
       },
       {
         model: Stage,
+        required: true, // Solo trae tareas que tienen Stage
+
         attributes: ["stageName", "stageOrder"],
         include: [
           {
@@ -1197,7 +1193,8 @@ if (taskList.length === 0) return null;
 
 const allStagesAreNull = taskList.every(t => t.Stage === null);
 if (allStagesAreNull) {
-  throw new ProjectWithoutStagesError ();
+  //throw new ProjectWithoutStagesError ();
+  return null
 }
   const result = mapTasksToProjectDetailsDto(taskList);
   return result;
