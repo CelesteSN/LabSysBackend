@@ -8,6 +8,8 @@ import { TaskStatusEnum } from "../enums/taskStatus.enum";
 import { ProjectType } from "../models/projectType.model";
 import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType, getAvailableUsersForProject , getOneStage, listTask, validateProjectDates} from "../services/project.service";
 import { Request, Response } from "express";
+import { StageFilter } from "../dtos/stageFilters.dto";
+import { StageStatusEnum } from "../enums/stageStatus.enum";
 
 
 export async function getAllProjects(req: Request, res: Response) {
@@ -161,7 +163,15 @@ export const getAllStages = catchAsync(async (req: Request, res: Response) => {
   const { userLoguedId } = (req as any).user;
   const projectId = req.params.projectId;
   const pageNumber = parseInt(req.query.pageNumber as string) || 0;
-  const stageList = await listStages(userLoguedId, projectId, pageNumber);
+
+
+const filters: StageFilter = {
+        pageNumber,
+        search: req.query.search as string,
+        status: req.query.status as StageStatusEnum || undefined,
+    };
+
+  const stageList = await listStages(userLoguedId, projectId, filters);
 
   if (stageList == null) {
     return res.status(200).json({

@@ -13,7 +13,7 @@ export const AllTaskFiltersSchema = Joi.object({
       'Pendiente',
       'En progreso',
      // 'Dado de baja',
-      'Finalizado',
+      'Finalizada',
       'Todos'
     )
     .messages({
