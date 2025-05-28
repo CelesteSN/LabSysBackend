@@ -1165,6 +1165,7 @@ if (stages.length === 0) {
       },
       {
         model: Stage,
+        required: true, // Solo trae tareas que tienen Stage
         attributes: ["stageName", "stageOrder"],
         include: [
           {
