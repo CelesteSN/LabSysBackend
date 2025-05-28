@@ -1,5 +1,5 @@
 import { Router } from "express";
-import {  createTask, getTaskById, updateTask, deleteTask, getAllComments, createComment} from "../controllers/task.controller";
+import {  createTask, getTaskById, updateTask, deleteTask, getAllComments, createComment, updateComment, deleteComment} from "../controllers/task.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { createTaskSchema } from '../schemas/createTask.schema';
@@ -20,6 +20,16 @@ taskRouter.post("/comments",
     createComment);
 taskRouter.get('/:taskId/comments', authenticateToken,checkBlacklist, getAllComments);
 
+taskRouter.put("/comments/:commentId", 
+   authenticateToken, 
+  checkBlacklist, 
+  ///validateRequest({ body: updateTaskSchema }), 
+  updateComment);
+
+taskRouter.delete("/comments/:commentId", 
+    authenticateToken, 
+    checkBlacklist, 
+    deleteComment);
 
     //Rutas de tareas
 taskRouter.post("/", 

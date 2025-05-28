@@ -9,13 +9,15 @@ import { updateProjectSchema } from "../validations/updateProject.validation";
 import {addMembersSchema} from "../validations/addMembers.validation";
 import {deleteMemberSchema} from "../validations/deleteMember.validation";
 import {stageSchema} from "../validations/createStage.schema";
+import {AllTaskFiltersSchema} from "../validations/allTaskFilters.schema";
+import {AllStageFiltersSchema} from "../validations/allStagesFilters.schema";
 
 
 
 export const projectRouter = Router();
 // 🟢 Rutas más específicas van primero
 // 🔵 Luego las más generales
-projectRouter.get('/:projectId/tasks', authenticateToken, checkBlacklist, getAllTask);
+projectRouter.get('/:projectId/tasks', authenticateToken, checkBlacklist, validateRequest({query: AllTaskFiltersSchema}), getAllTask);
 
 //tipo de proyectos
 
@@ -23,8 +25,8 @@ projectRouter.get('/:projectId/tasks', authenticateToken, checkBlacklist, getAll
 projectRouter.get('/project-type',authenticateToken,checkBlacklist,  getAllProjectType);
 
 //validateRequest({ query: searchValidation }),
-// 🔹 Operaciones sobre etapas de un proyecto (cambiarlas por el body)
-projectRouter.get('/:projectId/stages',authenticateToken,checkBlacklist,  getAllStages);
+// 🔹 Operaciones sobre etapas de un proyecto 
+projectRouter.get('/:projectId/stages',authenticateToken,checkBlacklist, validateRequest({query: AllStageFiltersSchema}), getAllStages);
 projectRouter.post('/:projectId/stages',authenticateToken,checkBlacklist,validateRequest({body: stageSchema}),  createStage);
 
 
@@ -33,7 +35,7 @@ projectRouter.put('/stage/:stageId',authenticateToken,checkBlacklist,validateReq
 projectRouter.delete('/stage/:stageId',authenticateToken,checkBlacklist,  deleteStageToProject);
 
 
-// // 🔹 Operaciones sobre miembros de un proyecto (cambiarlas por el body)
+// // 🔹 Operaciones sobre miembros de un proyecto 
 projectRouter.get('/:projectId/users',authenticateToken,checkBlacklist,  getAllUsersProject);
 projectRouter.get('/:projectId/members',authenticateToken,checkBlacklist,  getMembers);
 projectRouter.post('/:projectId/members',authenticateToken,checkBlacklist,validateRequest({body: addMembersSchema}),  addMemberToProject);
