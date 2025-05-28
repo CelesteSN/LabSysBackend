@@ -6,7 +6,7 @@ import { User } from "../models/user.model";
 import Stage from "../models/stage.model";
 import { UserStatusEnum } from "../enums/userStatus.enum";
 import ProjectUser from "../models/projectUser.model";
-import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError } from '../../../errors/customUserErrors';
+import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError, NotModifiOrDeleteCommentError } from '../../../errors/customUserErrors';
 import { parse, addDays } from 'date-fns';
 import { RoleEnum } from "../enums/role.enum";
 import { Op } from "sequelize";
@@ -482,30 +482,30 @@ export async function updateStageProgress(stageId: string): Promise<void> {
 }
 
 
-export async function listComment(userLoguedId: string, taskId: string, filters: CommentFilter): Promise<TaskDetailsDto|null> {
+export async function listComment(userLoguedId: string, taskId: string, filters: CommentFilter): Promise<TaskDetailsDto | null> {
     const userValidated = await validateActiveUser(userLoguedId);
     const userRole = await userValidated.getRole();
 
- const whereConditions: any = {};
+    const whereConditions: any = {};
 
-  
 
-  if (filters?.date) {
-  const startDate = parse(filters.date, 'dd-MM-yyyy', new Date());
-  const endDate = addDays(startDate, 1); // día siguiente a las 00:00
 
-  whereConditions.createdDate = {
-    [Op.gte]: startDate,
-    [Op.lt]: endDate
-  };
-}
+    if (filters?.date) {
+        const startDate = parse(filters.date, 'dd-MM-yyyy', new Date());
+        const endDate = addDays(startDate, 1); // día siguiente a las 00:00
+
+        whereConditions.createdDate = {
+            [Op.gte]: startDate,
+            [Op.lt]: endDate
+        };
+    }
 
     //Obtener la tarea y la valido
     const taskExist = await Task.findOne({
         where: { taskId: taskId },
         include: [{
             model: Stage,
-            include:[{
+            include: [{
                 model: Project
             }]
         }],
@@ -517,13 +517,13 @@ export async function listComment(userLoguedId: string, taskId: string, filters:
     const proy = await stageAux.getProject()
 
 
-     if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId) || userRole.roleName === RoleEnum.TUTOR)) {
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId) || userRole.roleName === RoleEnum.TUTOR)) {
         throw new ForbiddenAccessError()
     }
-  
+
     //Obtengo el listado de comentarios asociados a la tarea
     const commentList = await Comment.findAll({
-        where:whereConditions,
+        where: whereConditions,
         attributes: ["commentId", "createdDate", "commentDetail"],
         include: [
             {
@@ -557,8 +557,8 @@ export async function listComment(userLoguedId: string, taskId: string, filters:
 }
 
 
-export async function addComment(userLoguedId:string, taskId: string, commentDetail: string, commentType: string){
- const userValidated = await validateActiveUser(userLoguedId);
+export async function addComment(userLoguedId: string, taskId: string, commentDetail: string, commentType: string) {
+    const userValidated = await validateActiveUser(userLoguedId);
     const userRole = await userValidated.getRole();
 
     if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
@@ -639,4 +639,173 @@ export async function addComment(userLoguedId:string, taskId: string, commentDet
     newComment.save()
     return
 
+}
+
+
+export async function modifyComment(userLoguedId: string, commentId: string, commentDetail: string, commentType: string) {
+    const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
+
+    
+
+    const updateComment = await Comment.findOne({
+        where: {
+            commentId
+        },
+        include: [
+            {
+                model: User,
+                where: { userId: userLoguedId }
+            },
+            {
+                model: Task,
+            },
+        ],
+    });
+
+    if (!updateComment) { throw new NotFoundResultsError };
+
+
+    const createdAt = new Date(updateComment.createdDate);
+    const now = new Date();
+
+    if ((now.getTime() - createdAt.getTime()) / (1000 * 60) > 60) {
+        throw new NotModifiOrDeleteCommentError();
+    }
+
+
+
+    //  const validatedTask = await Task.findOne({
+    //         where: {
+    //             taskId: taskId,
+    //             taskUserId: userLoguedId
+    //         },
+    //         include: [
+    //             {
+    //                 model: TaskStatus,
+    //                 where: {
+    //                     taskStatusName:
+    //                         { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
+    //                 },
+    //                 attributes: ["taskStatusName"]
+    //             },
+    //             {
+    //                 model: User,
+    //                 where: {
+    //                     userId: userLoguedId
+    //                 }
+    //             },
+    //             {
+    //                 model: Stage,
+    //                 attributes: ["stageName"],
+    //                 include: [
+    //                     {
+    //                         model: StageStatus,
+    //                         where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
+    //                     },
+    //                     {
+    //                         model: Project,
+    //                         include: [
+    //                             {
+    //                                 model: ProjectStatus,
+    //                                 where: {
+    //                                     projectStatusName: {
+    //                                         [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+    //                                     }
+    //                                 },
+    //                             }
+    //                         ]
+    //                     }
+    //                 ],
+    //             }]
+    //     })
+
+    //     if (!validatedTask) { throw new NotFoundResultsError(); }
+    //     const stageAux = await validatedTask.getStage();
+    //     const proy = await stageAux.getProject()
+    //     if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
+    //         throw new ForbiddenAccessError()
+    //     }
+
+
+
+    //Valido tipo de comentario ingresado
+    const commentTypeExists = await CommentType.findOne({
+        where: {
+            commentTypeId: commentType,
+        },
+    });
+    if (!commentTypeExists) { throw new StatusNotFoundError };
+
+
+    //obtengo la tarea asociada y el uduario asociado
+    const taskAsociated = await updateComment.getTask();
+    const stageAsociated = await taskAsociated.getStage();
+    const projectAsociated = await stageAsociated.getProject();
+
+
+    if (userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE ){
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, projectAsociated.projectId))) {
+        throw new ForbiddenAccessError()
+    }
+    }
+
+    //modifico el comment 
+    updateComment.commentDetail = commentDetail;
+    updateComment.commentTypeId = commentTypeExists.commentTypeId;
+    updateComment.commentTaskId = taskAsociated.taskId;
+    updateComment.commentUserId = userValidated.userId;
+    updateComment.updatedDate = new Date();
+
+    updateComment.save()
+    return
+}
+
+export async function lowComment(userLoguedId: string, commentId: string){
+ const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
+
+    if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE )) {
+        throw new ForbiddenAccessError()
+    }
+
+    const deleteComment = await Comment.findOne({
+        where: {
+            commentId
+        },
+        include: [
+            {
+                model: User,
+                where: { userId: userLoguedId }
+            },
+            {
+                model: Task,
+            },
+        ],
+    });
+
+    if (!deleteComment) { throw new NotFoundResultsError };
+
+
+    const createdAt = new Date(deleteComment.createdDate);
+    const now = new Date();
+
+    if ((now.getTime() - createdAt.getTime()) / (1000 * 60) > 60) {
+        throw new NotModifiOrDeleteCommentError();
+    }
+
+
+      //obtengo la tarea asociada y el uduario asociado
+    const taskAsociated = await deleteComment.getTask();
+    const stageAsociated = await taskAsociated.getStage();
+    const projectAsociated = await stageAsociated.getProject();
+
+
+    if (userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE ){
+    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, projectAsociated.projectId))) {
+        throw new ForbiddenAccessError()
+    }
+    }
+deleteComment.destroy();
+return
 }

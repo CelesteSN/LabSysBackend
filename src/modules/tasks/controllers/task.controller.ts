@@ -3,7 +3,7 @@ import { AllTasksDto } from "../dtos/allTask.dto";
 import { CommentFilter } from "../dtos/commentFilter.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment} from "../services/task.service";
+import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment} from "../services/task.service";
 import { Request, Response } from "express";
 
 
@@ -122,4 +122,27 @@ export async function createComment(req: Request, res: Response) {
 }
 
 
+export const updateComment = catchAsync(async (req: Request, res: Response) => {
+  const { userLoguedId } = (req as any).user;
+  const commentId = req.params.commentId;
+  const commentDetail = req.body.commentDetail;
+  const commentType = req.body.commentType;
+ 
 
+  const user = await modifyComment(userLoguedId, commentId, commentDetail,  commentType );
+  res.status(200).json({
+    success: true,
+    message: "El comentario ha sido modificado exitosamente"
+  })
+
+});
+
+export const deleteComment = catchAsync(async (req: Request, res: Response) => {
+  const commentId = req.params.commentId;
+  const { userLoguedId } = (req as any).user;
+  await lowComment(userLoguedId, commentId);
+  res.status(200).json({
+    success: true,
+    message: "El comentario ha sido eliminado exitosamente"
+  })
+})

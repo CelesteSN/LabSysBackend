@@ -32,6 +32,7 @@ import { TaskStatus } from "../models/taskStatus.model";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { mapTasksToProjectDetailsDto, ProjectDetails1Dto } from "../dtos/allTask.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
+import { StageFilter } from "../dtos/stageFilters.dto";
 
 
 
@@ -610,7 +611,11 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
 
 
 
-export async function listStages(userLoguedId: string, projectId: string, pageNumber: number): Promise<ProjectDetailsDto | null> {
+export async function listStages(
+  userLoguedId: string,
+  projectId: string,
+  filters: StageFilter
+): Promise<ProjectDetailsDto | null> {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
@@ -636,13 +641,31 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
     throw new NotFoundResultsError();
   }
 
+  const whereConditions: any = {
+    stageProjectId: project.projectId
+  };
+
+  // Filtro por nombre de etapa (usando "search")
+  if (filters?.search) {
+    whereConditions.stageName = { [Op.iLike]: `%${filters.search}%` };
+  }
+
+  // Filtro por estado
+  const stageStatusInclude: any = {
+    model: StageStatus,
+    attributes: ["stageStatusName"]
+  };
+
+  if (filters?.status) {
+    stageStatusInclude.where = {
+      stageStatusName: filters.status
+    };
+  }
+
   const stageList = await Stage.findAll({
-    where: { stageProjectId: project.projectId },
+    where: whereConditions,
     include: [
-      {
-        model: StageStatus,
-        attributes: ["stageStatusName"]
-      },
+      stageStatusInclude,
       {
         model: Project,
         attributes: ["projectId"],
@@ -654,20 +677,82 @@ export async function listStages(userLoguedId: string, projectId: string, pageNu
         ]
       }
     ],
-
-
     order: [["stageOrder", "ASC"]],
     limit: parseInt(appConfig.ROWS_PER_PAGE),
-    offset: parseInt(appConfig.ROWS_PER_PAGE) * pageNumber,
+    offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
   });
 
-  if (stageList.length == 0) {
-    //throw new NotFoundResultsError();
-    return null
+  if (stageList.length === 0) {
+    return null;
   }
+
   const result = mapStageToDto(stageList);
-  return result
+  return result;
 }
+
+
+
+
+
+
+// export async function listStages(userLoguedId: string, projectId: string, filters: StageFilter): Promise<ProjectDetailsDto | null> {
+//   const userValidated = await validateActiveUser(userLoguedId);
+//   const userRole = await userValidated.getRole();
+
+//   if (userRole.roleName !== RoleEnum.TUTOR) {
+//     await validateProjectMembership(userLoguedId, projectId);
+//   }
+
+//   const project = await Project.findOne({
+//     where: { projectId },
+//     include: [
+//       {
+//         model: ProjectStatus,
+//         where: {
+//           projectStatusName: {
+//             [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+//           }
+//         },
+//       },
+//     ]
+//   });
+
+//   if (!project) {
+//     throw new NotFoundResultsError();
+//   }
+
+//   const stageList = await Stage.findAll({
+//     where: { stageProjectId: project.projectId },
+//     include: [
+//       {
+//         model: StageStatus,
+//         attributes: ["stageStatusName"]
+//       },
+//       {
+//         model: Project,
+//         attributes: ["projectId"],
+//         include: [
+//           {
+//             model: ProjectStatus,
+//             attributes: ['projectStatusName'],
+//           }
+//         ]
+//       }
+//     ],
+
+
+//     order: [["stageOrder", "ASC"]],
+//     limit: parseInt(appConfig.ROWS_PER_PAGE),
+//     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
+//   });
+
+//   if (stageList.length == 0) {
+//     //throw new NotFoundResultsError();
+//     return null
+//   }
+//   const result = mapStageToDto(stageList);
+//   return result
+// }
 
 
 export async function getOneStage(userLoguedId: string, stageId: string): Promise<OneStageDto> {
