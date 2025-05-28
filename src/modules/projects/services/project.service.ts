@@ -821,25 +821,25 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
 
 //Valido que el proyecto este pendiente, si ya hay alguna etapa en progreso, solo puede egregar etapas al final
 
-const allStagesInProject = await Stage.findAll({
-  where:{
-    stageProjectId : projectId
-  },
-  include: [
-    {
-      model: StageStatus,
-      where:{
-        stageStatusName:{
-          [Op.or]:[StageStatusEnum.FINISHED, StageStatusEnum.INPROGRESS]
-        }
+// const allStagesInProject = await Stage.findAll({
+//   where:{
+//     stageProjectId : projectId
+//   },
+//   include: [
+//     {
+//       model: StageStatus,
+//       where:{
+//         stageStatusName:{
+//           [Op.or]:[StageStatusEnum.FINISHED, StageStatusEnum.INPROGRESS]
+//         }
         
-      }
-    }
-  ],
-});
-if(allStagesInProject){
-  throw new StageStatusNotFound();
-}
+//       }
+//     }
+//   ],
+// });
+// if(allStagesInProject){
+//   throw new StageStatusNotFound();
+// }
 
  //Valido que el nombre ingresado no exista
   const stageExists = await Stage.findOne({
