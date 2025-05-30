@@ -1081,9 +1081,7 @@ export async function listTask(userLoguedId: string, projectId: string, filters:
     await validateProjectMembership(userLoguedId, projectId);
   }
 
-  //await validateProjectMembership(userLoguedId, projectId);
-
-  const whereConditions: any = {};
+    const whereConditions: any = {};
 
   // Filtro por búsqueda
   if (filters?.search) {
@@ -1093,9 +1091,9 @@ export async function listTask(userLoguedId: string, projectId: string, filters:
   }
 
   // Filtro por prioridad
-  if (filters?.priority) {
-    whereConditions.taskPriority = filters.priority;
-  }
+if (filters?.priority != null) {
+  whereConditions.taskPriority = filters.priority;
+}
 
   // Paso 1: Verificar si el proyecto tiene etapas
   const stages = await Stage.findAll({
@@ -1107,8 +1105,6 @@ export async function listTask(userLoguedId: string, projectId: string, filters:
     //throw new NotFoundStagesError();
     return null;
   }
-
-
 
   const taskList = await Task.findAll({
     where: whereConditions,

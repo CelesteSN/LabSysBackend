@@ -312,15 +312,16 @@ export async function getAllTask(req: Request, res: Response) {
     pageNumber,
     search: req.query.search as string,
     status: req.query.status as TaskStatusEnum || undefined,
-    priority: req.query.priority ? parseInt(req.query.priority as string) : undefined,
+  priority: req.query.priority != null ? Number(req.query.priority) : undefined,
   };
+  
 
   const tasks = await listTask(userLoguedId, projectId, filters);
 
   if (tasks == null) {
     return res.status(200).json({
       success: true,
-      message: 'No se encontraron resultados.',
+      //message: 'No se encontraron resultados.',
       data: []
     });
   }

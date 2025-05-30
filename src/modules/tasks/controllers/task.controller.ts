@@ -48,7 +48,7 @@ export async function updateTask(req: Request, res: Response) {
     const taskEndDate = req.body.taskEndDate;
     const taskDescription = req.body.taskDescription;
     const taskStatusId = req.body.taskStatusId;
-    const priority = req.body.priority;
+    const priority = req.body.taskPriority;
 
     await modifyTask(userLoguedId, taskId, taskName, taskOrder, taskStartDate, taskEndDate, taskStatusId, taskDescription, priority);
     res.status(200).json({
@@ -126,7 +126,7 @@ export const updateComment = catchAsync(async (req: Request, res: Response) => {
   const { userLoguedId } = (req as any).user;
   const commentId = req.params.commentId;
   const commentDetail = req.body.commentDetail;
-  const commentType = req.body.commentType;
+  const commentType = req.body.commentTypeId;
  
 
   const user = await modifyComment(userLoguedId, commentId, commentDetail,  commentType );

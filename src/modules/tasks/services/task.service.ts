@@ -6,7 +6,7 @@ import { User } from "../models/user.model";
 import Stage from "../models/stage.model";
 import { UserStatusEnum } from "../enums/userStatus.enum";
 import ProjectUser from "../models/projectUser.model";
-import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError, NotModifiOrDeleteCommentError, BadRequestStartDateStageError, BadRequestEndDateStageError } from '../../../errors/customUserErrors';
+import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError, NotModifiOrDeleteCommentError, BadRequestStartDateStageError, BadRequestEndDateStageError, BadRequestError } from '../../../errors/customUserErrors';
 import { parse, addDays } from 'date-fns';
 import { RoleEnum } from "../enums/role.enum";
 import { Op } from "sequelize";
@@ -40,13 +40,13 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
 
     if (!(userRole.roleName == RoleEnum.BECARIO || userRole.roleName == RoleEnum.PASANTE)) { throw new ForbiddenAccessError(); }
 
-    //Valido si es miembro y si la etapa esta en estado pendiente o en preogreso
+    //Valido si es miembro y si la etapa esta en estado pendiente o en progreso
     const stage1 = await Stage.findOne({
         where: { stageId: stageId },
         include: [
             {
                 model: StageStatus,
-                where: { "stageStatusName": { [Op.or]: [//StageStatusEnum.INPROGRESS, 
+                where: { "stageStatusName": { [Op.or]: [StageStatusEnum.INPROGRESS, 
                     StageStatusEnum.PENDING] } }
             },
             {
@@ -88,7 +88,7 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
         }
     })
     if (orderExist) { throw new OrderExistsError() };
-
+    
     //obtengo el estado pendiente para la nueva tarea
     let statusPending = await TaskStatus.findOne({
         where: {
@@ -112,15 +112,69 @@ export async function addTask(userLoguedId: string, stageId: string, taskName: s
         newTask.taskStageId = stage1.stageId,
         newTask.taskStatusId = statusPending.taskStatusId,
         newTask.taskUserId = userValidated.userId
-    await newTask.save();
 
-    await updateStageProgress(newTask.taskStageId);
-    await updateStageDates(newTask.taskStageId);
 
+    await validateTaskDateWithinProjectLimits(
+  newTask.taskStageId,
+  newTask.taskStartDate,
+  newTask.taskEndDate
+);
+
+await newTask.save();
+await updateStageProgress(newTask.taskStageId);
+await updateStageDates(newTask.taskStageId);
     return
 }
 
 
+
+
+//Funcion para validar antes de guardar si al agregar o editar una tarea se van a pasar los limites
+export async function validateTaskDateWithinProjectLimits(
+  taskStageId: string,
+  newStartDate: Date,
+  newEndDate: Date
+): Promise<void> {
+  // 1. Obtener todas las tareas existentes de la etapa
+  const existingTasks = await Task.findAll({
+    where: { taskStageId },
+    attributes: ['taskStartDate', 'taskEndDate']
+  });
+
+  // 2. Simular fechas con la nueva tarea
+  const simulatedDates = [
+    ...existingTasks,
+    { taskStartDate: newStartDate, taskEndDate: newEndDate }
+  ];
+
+  const startDates = simulatedDates.map(t => t.taskStartDate).filter(Boolean);
+  const endDates = simulatedDates.map(t => t.taskEndDate).filter(Boolean);
+
+  const minStart = new Date(Math.min(...startDates.map(d => new Date(d).getTime())));
+  const maxEnd = new Date(Math.max(...endDates.map(d => new Date(d).getTime())));
+
+  // 3. Obtener el proyecto asociado a la etapa
+  const stage = await Stage.findByPk(taskStageId, {
+    include: [{ model: Project }]
+  });
+
+  if (!stage || !stage.Project) {
+    //throw new BadRequestError("No se pudo encontrar el proyecto asociado a la etapa.");
+     throw new ForbiddenAccessError("No se pudo encontrar el proyecto asociado a la etapa.");
+  }
+
+  const projectStart = stage.Project.projectStartDate;
+  const projectEnd = stage.Project.projectEndDate;
+
+  // 4. Validar rango
+  if (minStart < projectStart || maxEnd > projectEnd) {
+    //throw new BadRequestError("La tarea extiende la etapa fuera del rango del proyecto.");
+     throw new ForbiddenAccessError("La tarea extiende la etapa fuera del rango del proyecto.");
+     
+  }
+}
+
+//Función para actualizar las fechas
 export async function updateStageDates(stageId: string): Promise<void> {
     // Obtener la etapa con su proyecto
     const stage = await Stage.findByPk(stageId, {
@@ -232,53 +286,43 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
 
 
     const task = await Task.findOne({
-        where: {
-            taskId: taskId
+  where: { taskId },
+  include: [
+    {
+      model: TaskStatus,
+      attributes: ["taskStatusName"]
+    },
+    {
+      model: User,
+      ...(isRestrictedRole
+        ? {
+            where: { userId: userLoguedId }
+          }
+        : {})
+    },
+    {
+      model: Stage,
+      attributes: ["stageName"],
+      include: [
+        {
+          model: StageStatus
+          // No poner where si no se filtra
         },
-        include: [
+        {
+          model: Project,
+          include: [
             {
-                model: TaskStatus,
-                where: {
-                    taskStatusName:
-                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
-                },
-                attributes: ["taskStatusName"]
-            },
-            {
-                model: User,
-                ...(isRestrictedRole
-                    ? {
-                        where: {
-                            userId: userLoguedId
-                        }
-                    }
-                    : {}),
-            },
-            {
-                model: Stage,
-                attributes: ["stageName"],
-                include: [
-                    {
-                        model: StageStatus,
-                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
-                    },
-                    {
-                        model: Project,
-                        include: [
-                            {
-                                model: ProjectStatus,
-                                where: {
-                                    projectStatusName: {
-                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-                                    }
-                                },
-                            }
-                        ]
-                    }
-                ],
+              model: ProjectStatus
+              // ❗ No dejar el where vacío ni comentado así
+              // O directamente sacalo si no filtrás
             }
-        ]
-    })
+          ]
+        }
+      ]
+    }
+  ]
+});
+
 
     if (!task) { throw new NotFoundResultsError(); }
     const stageAux = await task.getStage();
@@ -291,166 +335,346 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
     return result
 }
 
+export async function modifyTask(
+  userLoguedId: string,
+  taskId: string,
+  taskName: string,
+  taskOrder: number,
+  taskStartDate: string,
+  taskEndDate: string,
+  taskStatus: string,
+  taskDescription?: string,
+  priority?: number
+): Promise<Task | null> {
+  const userValidated = await validateActiveUser(userLoguedId);
+  const userRole = await userValidated.getRole();
 
+  if (!(userRole.roleName == RoleEnum.BECARIO || userRole.roleName == RoleEnum.PASANTE)) { throw new ForbiddenAccessError(); }
 
-export async function modifyTask(userLoguedId: string, taskId: string, taskName: string, taskOrder: number, taskStartDate: string, taskEndDate: string, taskStatus: string, taskDescription?: string, priority?: number): Promise<Task | null> {
+   
 
-    const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
-
-    if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
-        throw new ForbiddenAccessError()
-    }
-
-    //Obtener la tarea y la valido
-    //Valido el proyecto ingresado
-    const updatedTask = await Task.findOne({
+  const updatedTask = await Task.findOne({
+    where: { taskId, taskUserId: userLoguedId },
+    include: [
+      {
+        model: TaskStatus,
         where: {
-            taskId: taskId,
-            taskUserId: userLoguedId
+          taskStatusName: { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
         },
+        attributes: ["taskStatusName"]
+      },
+      {
+        model: User,
+        where: { userId: userLoguedId }
+      },
+      {
+        model: Stage,
+        attributes: ["stageName"],
         include: [
-            {
-                model: TaskStatus,
+          {
+            model: StageStatus,
+            where: {
+              stageStatusName: {
+                [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
+              }
+            }
+          },
+          {
+            model: Project,
+            include: [
+              {
+                model: ProjectStatus,
                 where: {
-                    taskStatusName:
-                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
-                },
-                attributes: ["taskStatusName"]
-            },
-            {
-                model: User,
-                where: {
-                    userId: userLoguedId
+                  projectStatusName: {
+                    [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+                  }
                 }
-            },
-            {
-                model: Stage,
-                attributes: ["stageName"],
-                include: [
-                    {
-                        model: StageStatus,
-                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
-                    },
-                    {
-                        model: Project,
-                        include: [
-                            {
-                                model: ProjectStatus,
-                                where: {
-                                    projectStatusName: {
-                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-                                    }
-                                },
-                            }
-                        ]
-                    }
-                ],
-            }]
-    })
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
 
-    if (!updatedTask) { throw new NotFoundResultsError(); }
-    const stageAux = await updatedTask.getStage();
-    const proy = await stageAux.getProject()
-    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
-        throw new ForbiddenAccessError()
+  if (!updatedTask) throw new NotFoundResultsError();
+
+  const stageAux = await updatedTask.getStage();
+  const proy = await stageAux.getProject();
+
+  if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
+    throw new ForbiddenAccessError();
+  }
+
+  // Validar nombre duplicado
+  const taskNameExists = await Task.findOne({
+    where: {
+      taskTitle: taskName,
+      taskStageId: stageAux.stageId,
+      taskId: { [Op.ne]: taskId }
     }
+  });
 
-    //Valido que el nombre ingresado no exista
-    const taskNameExists = await Task.findOne({
-        where: {
-            taskTitle: taskName,
-            taskStageId: stageAux.stageId,
-            taskId: { [Op.ne]: taskId } // excluye la etapa actual
-        },
-    });
-    if (taskNameExists) { throw new NameUsedError() };
+  if (taskNameExists) throw new NameUsedError();
 
+  // Validar orden duplicado
+  const orderExist = await Task.findOne({
+    where: {
+      taskOrder,
+      taskStageId: stageAux.stageId,
+      taskId: { [Op.ne]: taskId }
+    }
+  });
 
-    //valido el orden
-    const orderExist = await Task.findOne({
-        where: {
-            taskOrder: taskOrder,
-            taskStageId: stageAux.stageId,
-            taskId: { [Op.ne]: taskId } // excluye la etapa actual
+  if (orderExist) throw new OrderExistsError();
 
-        }
-    })
-    if (orderExist) { throw new OrderExistsError() };
+  // Validar status
+  const validStatus = await TaskStatus.findOne({
+    where: { taskStatusId: taskStatus }
+  });
 
-    //valido el status
-    const validStatus = await TaskStatus.findOne({
-        where: {
-            taskStatusId: taskStatus
-        }
-    });
-    if (!validStatus) { throw new StatusNotFoundError() };
+  if (!validStatus) throw new StatusNotFoundError();
 
-    updatedTask.taskTitle = taskName;
-    updatedTask.taskOrder = taskOrder;
-    updatedTask.updatedDate = new Date();
-    updatedTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date()),
-        updatedTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
-        updatedTask.taskPriority = Number(priority) || null,
-        updatedTask.taskDescription = taskDescription || null,
-        updatedTask.taskStatusId = validStatus.taskStatusId,
+  // 🔎 Validar fechas antes de guardar
+  const parsedStart = parse(taskStartDate, 'dd-MM-yyyy', new Date());
+  const parsedEnd = parse(taskEndDate, 'dd-MM-yyyy', new Date());
 
+  await validateTaskDateWithinProjectLimits(updatedTask.taskStageId, parsedStart, parsedEnd);
 
-        await updatedTask.save(); // Guardar los cambios en la base de datos
-    await updateStageProgress(updatedTask.taskStageId);
-    await updateStageDates(updatedTask.taskStageId);
-    return updatedTask;
+  // ✅ Actualizar valores
+  updatedTask.taskTitle = taskName;
+  updatedTask.taskOrder = taskOrder;
+  updatedTask.taskStartDate = parsedStart;
+  updatedTask.taskEndDate = parsedEnd;
+  updatedTask.taskPriority = Number(priority) || null;
+  updatedTask.taskDescription = taskDescription || null;
+  updatedTask.taskStatusId = validStatus.taskStatusId;
+  updatedTask.updatedDate = new Date();
+
+  // Guardar y actualizar etapa
+  await updatedTask.save();
+  await updateStageProgress(updatedTask.taskStageId);
+  await updateStageDates(updatedTask.taskStageId);
+
+  return updatedTask;
 }
+
+
+// export async function modifyTask(userLoguedId: string, taskId: string, taskName: string, taskOrder: number, taskStartDate: string, taskEndDate: string, taskStatus: string, taskDescription?: string, priority?: number): Promise<Task | null> {
+
+//     const userValidated = await validateActiveUser(userLoguedId);
+//     const userRole = await userValidated.getRole();
+
+//     if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
+//         throw new ForbiddenAccessError()
+//     }
+
+//     //Obtener la tarea y la valido
+//     //Valido el proyecto ingresado
+//     const updatedTask = await Task.findOne({
+//         where: {
+//             taskId: taskId,
+//             taskUserId: userLoguedId
+//         },
+//         include: [
+//             {
+//                 model: TaskStatus,
+//                 where: {
+//                     taskStatusName:
+//                         { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
+//                 },
+//                 attributes: ["taskStatusName"]
+//             },
+//             {
+//                 model: User,
+//                 where: {
+//                     userId: userLoguedId
+//                 }
+//             },
+//             {
+//                 model: Stage,
+//                 attributes: ["stageName"],
+//                 include: [
+//                     {
+//                         model: StageStatus,
+//                         where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
+//                     },
+//                     {
+//                         model: Project,
+//                         include: [
+//                             {
+//                                 model: ProjectStatus,
+//                                 where: {
+//                                     projectStatusName: {
+//                                         [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+//                                     }
+//                                 },
+//                             }
+//                         ]
+//                     }
+//                 ],
+//             }]
+//     })
+
+//     if (!updatedTask) { throw new NotFoundResultsError(); }
+//     const stageAux = await updatedTask.getStage();
+//     const proy = await stageAux.getProject()
+//     if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
+//         throw new ForbiddenAccessError()
+//     }
+
+//     //Valido que el nombre ingresado no exista
+//     const taskNameExists = await Task.findOne({
+//         where: {
+//             taskTitle: taskName,
+//             taskStageId: stageAux.stageId,
+//             taskId: { [Op.ne]: taskId } // excluye la etapa actual
+//         },
+//     });
+//     if (taskNameExists) { throw new NameUsedError() };
+
+
+//     //valido el orden
+//     const orderExist = await Task.findOne({
+//         where: {
+//             taskOrder: taskOrder,
+//             taskStageId: stageAux.stageId,
+//             taskId: { [Op.ne]: taskId } // excluye la etapa actual
+
+//         }
+//     })
+//     if (orderExist) { throw new OrderExistsError() };
+
+//     //valido el status
+//     const validStatus = await TaskStatus.findOne({
+//         where: {
+//             taskStatusId: taskStatus
+//         }
+//     });
+//     if (!validStatus) { throw new StatusNotFoundError() };
+
+//     updatedTask.taskTitle = taskName;
+//     updatedTask.taskOrder = taskOrder;
+//     updatedTask.updatedDate = new Date();
+//     updatedTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date()),
+//         updatedTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date()),
+//         updatedTask.taskPriority = Number(priority) || null,
+//         updatedTask.taskDescription = taskDescription || null,
+//         updatedTask.taskStatusId = validStatus.taskStatusId,
+
+
+//         await updatedTask.save(); // Guardar los cambios en la base de datos
+//     await updateStageProgress(updatedTask.taskStageId);
+//     await updateStageDates(updatedTask.taskStageId);
+//     return updatedTask;
+// }
+
 
 
 export async function lowTask(userLoguedId: string, taskId: string) {
+  const userValidated = await validateActiveUser(userLoguedId);
+  const userRole = await userValidated.getRole();
 
-    const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
+  if (![RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum)) {
+    throw new ForbiddenAccessError();
+  }
 
-    if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
-        throw new ForbiddenAccessError()
-    }
-
-    const deletedTask = await Task.findOne({
+  const deletedTask = await Task.findOne({
+    where: {
+      taskId,
+      taskUserId: userLoguedId
+    },
+    include: [
+      {
+        model: TaskStatus,
         where: {
-            taskId: taskId,
-            taskUserId: userLoguedId
-        },
-        include: [
-            {
-                model: TaskStatus,
-                where: {
-                    taskStatusName: {
-                        [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING]
-                    }
-                },
-            },
-        ]
+          taskStatusName: {
+            [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING]
+          }
+        }
+      }
+    ]
+  });
 
-    });
-    if (!deletedTask) {
-        throw new NotFoundResultsError();
+  if (!deletedTask) {
+    throw new NotFoundResultsError();
+  }
+
+  // 🔍 Obtener la etapa y proyecto
+  const taskStage = await deletedTask.getStage();
+  if (!taskStage) throw new Error("La tarea no tiene etapa asociada.");
+
+  const stageProject = await taskStage.getProject();
+  if (!stageProject) throw new Error("La etapa no tiene proyecto asociado.");
+
+  // 🔒 Validar que el usuario está asignado al proyecto
+  await validateProjectMembership(userLoguedId, stageProject.projectId);
+
+  // 🗑 Eliminar todos los comentarios asociados a la tarea
+  await Comment.destroy({
+    where: {
+      commentTaskId: deletedTask.taskId
     }
+  });
 
-    //Obtener el id de proyecto a partir de la etapa
+  // 🗑 Eliminar la tarea
+  await deletedTask.destroy();
 
-    const taskStage = await deletedTask.getStage();
-    const stageProject = await taskStage.getProject();
+  // 🔁 Recalcular etapa
+  await updateStageProgress(deletedTask.taskStageId);
+  await updateStageDates(deletedTask.taskStageId);
 
-    //Validar que este asignado al proyecto
-    await validateProjectMembership(userLoguedId, stageProject.projectId);
- //Elimino todas las tareas asociadas
-    await Comment.destroy({
-    where:{
-    commentTaskId : deletedTask.taskId
+  return;
 }
-  })
-    deletedTask.destroy();
-    await updateStageProgress(deletedTask.taskStageId);
-    await updateStageDates(deletedTask.taskStageId);
-    return
-}
+
+// export async function lowTask(userLoguedId: string, taskId: string) {
+
+//     const userValidated = await validateActiveUser(userLoguedId);
+//     const userRole = await userValidated.getRole();
+
+//     if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
+//         throw new ForbiddenAccessError()
+//     }
+
+//     const deletedTask = await Task.findOne({
+//         where: {
+//             taskId: taskId,
+//             taskUserId: userLoguedId
+//         },
+//         include: [
+//             {
+//                 model: TaskStatus,
+//                 where: {
+//                     taskStatusName: {
+//                         [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING]
+//                     }
+//                 },
+//             },
+//         ]
+
+//     });
+//     if (!deletedTask) {
+//         throw new NotFoundResultsError();
+//     }
+
+//     //Obtener el id de proyecto a partir de la etapa
+
+//     const taskStage = await deletedTask.getStage();
+//     const stageProject = await taskStage.getProject();
+
+//     //Validar que este asignado al proyecto
+//     await validateProjectMembership(userLoguedId, stageProject.projectId);
+//  //Elimino todas las tareas asociadas
+//     await Comment.destroy({
+//     where:{
+//     commentTaskId : deletedTask.taskId
+// }
+//   })
+//     deletedTask.destroy();
+//     await updateStageProgress(deletedTask.taskStageId);
+//     await updateStageDates(deletedTask.taskStageId);
+//     return
+// }
 
 //Función para validar si existe el usuario y si esta en estado activo
 
@@ -605,323 +829,248 @@ export async function listComment(userLoguedId: string, taskId: string, filters:
 
 
 export async function addComment(userLoguedId: string, taskId: string, commentDetail: string, commentType: string) {
-    const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
+  const userValidated = await validateActiveUser(userLoguedId);
+  const userRole = await userValidated.getRole();
 
-    if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
-        throw new ForbiddenAccessError()
-    }
-
-    //Obtener la tarea y la valido
-    //Valido el proyecto ingresado
-    const validatedTask = await Task.findOne({
+  // Obtener la tarea sin filtrar por usuario
+  const validatedTask = await Task.findOne({
+    where: { taskId },
+    include: [
+      {
+        model: TaskStatus,
         where: {
-            taskId: taskId,
-            taskUserId: userLoguedId
+          taskStatusName: {
+            [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING]
+          }
         },
+        attributes: ["taskStatusName"]
+      },
+      {
+        model: User,
+        attributes: ["userId"]
+      },
+      {
+        model: Stage,
+        attributes: ["stageName"],
         include: [
-            {
-                model: TaskStatus,
+          {
+            model: StageStatus,
+            where: {
+              stageStatusName: {
+                [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
+              }
+            }
+          },
+          {
+            model: Project,
+            include: [
+              {
+                model: ProjectStatus,
                 where: {
-                    taskStatusName:
-                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
-                },
-                attributes: ["taskStatusName"]
-            },
-            {
-                model: User,
-                where: {
-                    userId: userLoguedId
+                  projectStatusName: {
+                    [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+                  }
                 }
-            },
-            {
-                model: Stage,
-                attributes: ["stageName"],
-                include: [
-                    {
-                        model: StageStatus,
-                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
-                    },
-                    {
-                        model: Project,
-                        include: [
-                            {
-                                model: ProjectStatus,
-                                where: {
-                                    projectStatusName: {
-                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-                                    }
-                                },
-                            }
-                        ]
-                    }
-                ],
-            }]
-    })
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
 
-    if (!validatedTask) { throw new NotFoundResultsError(); }
-    const stageAux = await validatedTask.getStage();
-    const proy = await stageAux.getProject()
-    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
-        throw new ForbiddenAccessError()
-    }
+  if (!validatedTask) throw new NotFoundResultsError();
 
-    //Valido tipo de comentario ingresado
-    const commentTypeExists = await CommentType.findOne({
-        where: {
-            commentTypeId: commentType,
-        },
-    });
-    if (!commentTypeExists) { throw new StatusNotFoundError };
+  // Validar si es TUTOR o responsable de la tarea
+  const isOwner = validatedTask.taskUserId === userLoguedId;
+  const isTutor = userRole.roleName === RoleEnum.TUTOR;
 
-    //creo el comment y lo asocio a la tarea
-    const newComment = await Comment.build();
-    newComment.commentDetail = commentDetail;
-    newComment.commentTypeId = commentTypeExists.commentTypeId;
-    newComment.commentTaskId = validatedTask.taskId;
-    newComment.commentUserId = userValidated.userId;
-    newComment.createdDate = new Date();
-    newComment.updatedDate = new Date();
+  if (!isTutor && !isOwner) {
+    throw new ForbiddenAccessError();
+  }
 
-    newComment.save()
-    return
+  // Validar relación con el proyecto
+  const stageAux = await validatedTask.getStage();
+  const proy = await stageAux.getProject();
 
+//   if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
+//     throw new ForbiddenAccessError();
+//   }
+
+  // Validar tipo de comentario
+  const commentTypeExists = await CommentType.findOne({
+    where: { commentTypeId: commentType }
+  });
+
+  if (!commentTypeExists) {
+    throw new StatusNotFoundError();
+  }
+
+  // Crear y guardar comentario
+  const newComment = await Comment.create({
+    commentDetail,
+    commentTypeId: commentTypeExists.commentTypeId,
+    commentTaskId: validatedTask.taskId,
+    commentUserId: userValidated.userId,
+    createdDate: new Date(),
+    updatedDate: new Date()
+  });
+
+  return newComment;
 }
 
 
-export async function modifyComment(userLoguedId: string, commentId: string, commentDetail: string, commentType: string) {
-    const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
+export async function modifyComment(
+  userLoguedId: string,
+  commentId: string,
+  commentDetail: string,
+  commentType: string
+) {
+  const userValidated = await validateActiveUser(userLoguedId);
+  const userRole = await userValidated.getRole();
 
-    
+  // Buscar comentario sin filtrar por usuario
+  const updateComment = await Comment.findOne({
+    where: { commentId },
+    include: [
+      {
+        model: Task
+      }
+    ]
+  });
 
-    const updateComment = await Comment.findOne({
-        where: {
-            commentId
-        },
-        include: [
-            {
-                model: User,
-                where: { userId: userLoguedId }
-            },
-            {
-                model: Task,
-            },
-        ],
-    });
+  if (!updateComment) throw new NotFoundResultsError();
 
-    if (!updateComment) { throw new NotFoundResultsError };
+  // Verificar que el usuario logueado es el autor del comentario
+  const isOwner = updateComment.commentUserId === userLoguedId;
+  if (!isOwner) throw new ForbiddenAccessError();
 
+  // Validar límite de 60 minutos desde creación
+  const createdAt = new Date(updateComment.createdDate);
+  const now = new Date();
+  const elapsedMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+  if (elapsedMinutes > 60) {
+    throw new NotModifiOrDeleteCommentError();
+  }
 
-    const createdAt = new Date(updateComment.createdDate);
-    const now = new Date();
+  // Validar tipo de comentario
+  const commentTypeExists = await CommentType.findOne({
+    where: { commentTypeId: commentType }
+  });
+  if (!commentTypeExists) throw new StatusNotFoundError();
 
-    if ((now.getTime() - createdAt.getTime()) / (1000 * 60) > 60) {
-        throw new NotModifiOrDeleteCommentError();
-    }
+  // 🔒 Validar que el autor todavía pertenece al proyecto
+  const taskAssociated = await updateComment.getTask();
+  const stageAssociated = await taskAssociated.getStage();
+  const projectAssociated = await stageAssociated.getProject();
 
+//   const isStillMember = await validateProjectMembershipWhitReturn(userValidated.userId, projectAssociated.projectId);
+//   if (!isStillMember) throw new ForbiddenAccessError();
 
+  // ✅ Actualizar comentario
+  updateComment.commentDetail = commentDetail;
+  updateComment.commentTypeId = commentTypeExists.commentTypeId;
+  updateComment.updatedDate = new Date();
 
-    //  const validatedTask = await Task.findOne({
-    //         where: {
-    //             taskId: taskId,
-    //             taskUserId: userLoguedId
-    //         },
-    //         include: [
-    //             {
-    //                 model: TaskStatus,
-    //                 where: {
-    //                     taskStatusName:
-    //                         { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
-    //                 },
-    //                 attributes: ["taskStatusName"]
-    //             },
-    //             {
-    //                 model: User,
-    //                 where: {
-    //                     userId: userLoguedId
-    //                 }
-    //             },
-    //             {
-    //                 model: Stage,
-    //                 attributes: ["stageName"],
-    //                 include: [
-    //                     {
-    //                         model: StageStatus,
-    //                         where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
-    //                     },
-    //                     {
-    //                         model: Project,
-    //                         include: [
-    //                             {
-    //                                 model: ProjectStatus,
-    //                                 where: {
-    //                                     projectStatusName: {
-    //                                         [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-    //                                     }
-    //                                 },
-    //                             }
-    //                         ]
-    //                     }
-    //                 ],
-    //             }]
-    //     })
+  await updateComment.save();
 
-    //     if (!validatedTask) { throw new NotFoundResultsError(); }
-    //     const stageAux = await validatedTask.getStage();
-    //     const proy = await stageAux.getProject()
-    //     if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
-    //         throw new ForbiddenAccessError()
-    //     }
-
-
-
-    //Valido tipo de comentario ingresado
-    const commentTypeExists = await CommentType.findOne({
-        where: {
-            commentTypeId: commentType,
-        },
-    });
-    if (!commentTypeExists) { throw new StatusNotFoundError };
-
-
-    //obtengo la tarea asociada y el uduario asociado
-    const taskAsociated = await updateComment.getTask();
-    const stageAsociated = await taskAsociated.getStage();
-    const projectAsociated = await stageAsociated.getProject();
-
-
-    if (userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE ){
-    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, projectAsociated.projectId))) {
-        throw new ForbiddenAccessError()
-    }
-    }
-
-    //modifico el comment 
-    updateComment.commentDetail = commentDetail;
-    updateComment.commentTypeId = commentTypeExists.commentTypeId;
-    updateComment.commentTaskId = taskAsociated.taskId;
-    updateComment.commentUserId = userValidated.userId;
-    updateComment.updatedDate = new Date();
-
-    updateComment.save()
-    return
+  return;
 }
 
-export async function lowComment(userLoguedId: string, commentId: string){
- const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
 
-    if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE )) {
-        throw new ForbiddenAccessError()
-    }
+export async function lowComment(userLoguedId: string, commentId: string) {
+  const userValidated = await validateActiveUser(userLoguedId);
 
-    const deleteComment = await Comment.findOne({
-        where: {
-            commentId
-        },
-        include: [
-            {
-                model: User,
-                where: { userId: userLoguedId }
-            },
-            {
-                model: Task,
-            },
-        ],
-    });
+  const deleteComment = await Comment.findOne({
+    where: { commentId },
+    include: [{ model: Task }]
+  });
 
-    if (!deleteComment) { throw new NotFoundResultsError };
+  if (!deleteComment) throw new NotFoundResultsError();
 
+  // Validar autoría
+  const isOwner = deleteComment.commentUserId === userLoguedId;
+  if (!isOwner) throw new ForbiddenAccessError();
 
-    const createdAt = new Date(deleteComment.createdDate);
-    const now = new Date();
+  // Validar tiempo límite de 60 minutos
+  const createdAt = new Date(deleteComment.createdDate);
+  const now = new Date();
+  const minutesPassed = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
-    if ((now.getTime() - createdAt.getTime()) / (1000 * 60) > 60) {
-        throw new NotModifiOrDeleteCommentError();
-    }
+  if (minutesPassed > 60) {
+    throw new NotModifiOrDeleteCommentError();
+  }
 
+  // Validar que aún pertenece al proyecto
+  const taskAssociated = await deleteComment.getTask();
+  const stageAssociated = await taskAssociated.getStage();
+  const projectAssociated = await stageAssociated.getProject();
 
-      //obtengo la tarea asociada y el uduario asociado
-    const taskAsociated = await deleteComment.getTask();
-    const stageAsociated = await taskAsociated.getStage();
-    const projectAsociated = await stageAsociated.getProject();
+//   const isStillMember = await validateProjectMembershipWhitReturn(userValidated.userId, projectAssociated.projectId);
+//   if (!isStillMember) throw new ForbiddenAccessError();
 
+  // Eliminar comentario
+  await deleteComment.destroy();
 
-    if (userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE ){
-    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, projectAsociated.projectId))) {
-        throw new ForbiddenAccessError()
-    }
-    }
-deleteComment.destroy();
-return
+  return;
 }
 
-export async function getOneComment(userLoguedId: string, commentId: string){
-    const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
 
-    const isRestrictedRole = [RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum);
+export async function getOneComment(userLoguedId: string, commentId: string) {
+  const userValidated = await validateActiveUser(userLoguedId);
+  const userRole = await userValidated.getRole();
 
-
-    const comment = await Comment.findOne({
-        where: {
-            commentId: commentId
+  const comment = await Comment.findOne({
+  where: { commentId },
+  include: [
+    {
+        model:CommentType,
+        attributes:["commentTypeName"]
+    },
+    {
+      model: User, // Autor del comentario
+      attributes: ["userId", "userFirstName", "userLastName"]
+    },
+    {
+      model: Task,
+      include: [
+        {
+          model: TaskStatus,
+          attributes: ["taskStatusName"]
         },
-        include: [
-            {model: Task,
-            include:[{
-                model: TaskStatus,
-                where: {
-                    taskStatusName:
-                        { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
-                },
-                attributes: ["taskStatusName"]},   
-                        {
-                model: User,
-                ...(isRestrictedRole
-                    ? {
-                        where: {
-                            userId: userLoguedId
-                        }
-                    }
-                    : {}),
-                    },
-                    {
-                model: Stage,
-                attributes: ["stageName"],
-                include: [
-                    {
-                        model: StageStatus,
-                        where: { stageStatusName: { [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING] } }
-                    },
-                    {
-                        model: Project,
-                        include: [
-                            {
-                                model: ProjectStatus,
-                                where: {
-                                    projectStatusName: {
-                                        [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-                                    }
-                                },
-                            }
-                        ]
-                    }
-                ],
-            }]
-    }]
-    })
-
-    if (!comment) { throw new NotFoundResultsError(); }
-    const taskAux = await comment.getTask();
-    const stageAux = await taskAux.getStage();
-    const pro = await stageAux.getProject()
-    if (!(await validateProjectMembershipWhitReturn(userValidated.userId, pro.projectId) || userRole.roleName === RoleEnum.TUTOR)) {
-        throw new ForbiddenAccessError()
+        {
+          model: User,
+          attributes: ["userId", "userFirstName", "userLastName"]
+        },
+        {
+          model: Stage,
+          attributes: ["stageName"],
+          include: [
+            { model: StageStatus },
+            {
+              model: Project,
+              include: [{ model: ProjectStatus }]
+            }
+          ]
+        }
+      ]
     }
-    const result = mapOneCommentToDto(comment)
+  ]
+});
+  if (!comment) {
+    throw new NotFoundResultsError();
+  }
 
-    return result
+  const task = comment.Task;
+  const isTutor = userRole.roleName === RoleEnum.TUTOR;
+  const isOwner = task.taskUserId === userLoguedId;
+
+  if (!isTutor && !isOwner) {
+    throw new ForbiddenAccessError();
+  }
+
+  const result = mapOneCommentToDto(comment);
+  return result;
 }
+
 

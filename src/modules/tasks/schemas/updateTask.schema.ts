@@ -52,12 +52,12 @@ export const updateTaskSchema = Joi.object({
       'string.max': 'La descripción debe tener como máximo 255 caracteres.'
     }),
 
-  taskPriority: Joi.number()
-    .valid(1, 2, 3)
-    .messages({
-      'any.only': 'La prioridad debe ser 1 (baja), 2 (media) o 3 (alta).',
-      'any.required': 'La prioridad es obligatoria.'
-    }),
+ taskPriority: Joi.number()
+     .valid(0, 1, 2, 3)
+     .messages({
+       'any.only': 'La prioridad debe ser 0 (baja), 1 (media), 2 (alta) o 3 (urgente).',
+       'any.required': 'La prioridad es obligatoria.'
+     }),
 
     taskStartDate: Joi.string()
       .pattern(/^\d{2}-\d{2}-\d{4}$/)

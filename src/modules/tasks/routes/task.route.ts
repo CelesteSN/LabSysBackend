@@ -21,7 +21,7 @@ taskRouter.post("/:taskId/upload",authenticateToken, checkBlacklist, upload.sing
 
 //Rutas de comentario
 taskRouter.post("/comments", authenticateToken, checkBlacklist,validateRequest({ body: createCommentSchema }), createComment);
-taskRouter.get('/comments/:commentId', authenticateToken,checkBlacklist, validateRequest({query: AllCommentFiltersSchema}), getCommentById);
+taskRouter.get('/comments/:commentId', authenticateToken,checkBlacklist, getCommentById);
 taskRouter.get('/:taskId/comments', authenticateToken,checkBlacklist, validateRequest({query: AllCommentFiltersSchema}), getAllComments);
 taskRouter.put("/comments/:commentId", authenticateToken, checkBlacklist, validateRequest({ body: updateCommentSchema }), updateComment);
 taskRouter.delete("/comments/:commentId", authenticateToken, checkBlacklist, deleteComment);
