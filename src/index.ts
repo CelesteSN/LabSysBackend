@@ -12,8 +12,14 @@ import {projectRouter} from "./modules/projects/routes/project.route";
 import { taskRouter } from "./modules/tasks/routes/task.route";
 //import {connectToDatabase} from './config/database2';
 dotenv.config();
+import path from "path";
+import { ENV } from "./config/env";
 
 const app = express();
+// Middleware para servir archivos estáticos
+app.use("/uploads", express.static(path.join(__dirname, `../${ENV.UPLOADS_PATH}`)));
+
+
 app.use(express.json());
 app.use(cors({ origin: true, optionsSuccessStatus: 200, credentials: true })); //Habilitamos los cors.
 app.use(bodyParser.urlencoded({ extended: true, limit: "20mb" }));

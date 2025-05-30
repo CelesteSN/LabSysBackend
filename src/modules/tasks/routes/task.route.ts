@@ -8,12 +8,15 @@ import { updateTaskSchema } from "../schemas/updateTask.schema";
 import {createCommentSchema} from "../schemas/createComment.schema";
 import {updateCommentSchema} from "../schemas/updateComment.schema";
 import {AllCommentFiltersSchema} from "../schemas/allCommentFilter.schema";
-
+import { upload } from "../../../middlewares/upload.middleware";
+import { handleTaskFileUpload } from "../controllers/upload.controller";
 
 
 export const taskRouter = Router();
 
 //Rutas de adjuntos
+taskRouter.post("/:taskId/upload",authenticateToken, checkBlacklist, upload.single("file"), handleTaskFileUpload);
+
 
 
 //Rutas de comentario

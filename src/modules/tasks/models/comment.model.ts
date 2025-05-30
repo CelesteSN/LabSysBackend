@@ -97,7 +97,9 @@ import {
   });
 
   Comment.belongsTo(Task, {
-    foreignKey: 'comment_task_id'
+    foreignKey: 'comment_task_id',
+      onDelete: 'CASCADE',
+
   });
   
   Comment.belongsTo(CommentType, {

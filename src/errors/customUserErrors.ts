@@ -24,6 +24,12 @@ export class BadRequestStartDateStageError extends BaseError {
     }
 }
 
+
+export class NotFoundProjectError extends BaseError {
+    constructor() {
+        super("No es posible realizar esta acción sobre el proyecto.", 409); // 409 Conflict
+    }
+}
 export class BadRequestEndDateStageError extends BaseError {
     constructor() {
         super("La fecha de finalización de la etapa no puede ser posterior a la fecha de fin del proyecto.", 409); // 409 Conflict

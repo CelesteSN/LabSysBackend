@@ -6,7 +6,7 @@ import { TaskFilter } from "../dtos/taskFilters.dto";
 import { ProjectStatusEnum } from "../enums/projectStatus.enum";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
 import { ProjectType } from "../models/projectType.model";
-import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType, getAvailableUsersForProject , getOneStage, listTask, validateProjectDates} from "../services/project.service";
+import { listProjects, saveNewProject, getProject, modifyProject, lowproject, listMembers, addMenmbers, lowMember, listStages, addNewStage, lowStage, modifyStage, listProjectType, getAvailableUsersForProject, getOneStage, listTask, validateProjectDates, validateProjectStartDate } from "../services/project.service";
 import { Request, Response } from "express";
 import { StageFilter } from "../dtos/stageFilters.dto";
 import { StageStatusEnum } from "../enums/stageStatus.enum";
@@ -27,7 +27,7 @@ export async function getAllProjects(req: Request, res: Response) {
     return res.status(200).json({
       success: true,
       pageNumber,
-      message: 'No se encontraron resultados',
+      //message: 'No se encontraron resultados',
       data: []
     });
   }
@@ -40,8 +40,6 @@ export async function getAllProjects(req: Request, res: Response) {
 };
 
 
-
-
 export async function createProject(req: Request, res: Response): Promise<void> {
 
   const { userLoguedId } = (req as any).user;
@@ -50,8 +48,19 @@ export async function createProject(req: Request, res: Response): Promise<void> 
   const startDate = req.body.startDate;
   const endDate = req.body.endDate;
 
-// Validar fechas
+  // Validar fechas
   await validateProjectDates(startDate, endDate);
+
+  //Valido q la fecha de inicio sea igual o posterior a la facha actual
+  const result = validateProjectStartDate(startDate);
+
+  if (!result.valid) {
+    res.status(400).json({
+      success: false,
+      message: "La fecha de inicio del proyecto no puede ser anterior a hoy."
+    });
+  }
+
 
   const newProject = await saveNewProject(userLoguedId, projectName, projectTypeId, startDate, endDate);
   res.status(201).json({
@@ -59,8 +68,6 @@ export async function createProject(req: Request, res: Response): Promise<void> 
     message: "El proyecto ha sido creado exitosamente."
   });
 }
-
-
 
 
 export const getProjectById = catchAsync(async (req: Request, res: Response) => {
@@ -74,7 +81,6 @@ export const getProjectById = catchAsync(async (req: Request, res: Response) => 
 });
 
 
-
 export const updateProject = catchAsync(async (req: Request, res: Response) => {
   const { userLoguedId } = (req as any).user;
   const projectId = req.params.projectId;
@@ -84,11 +90,20 @@ export const updateProject = catchAsync(async (req: Request, res: Response) => {
   const startDate = req.body.startDate;
   const endDate = req.body.endDate;
 
-// Validar fechas
+  // Validar fechas
   await validateProjectDates(startDate, endDate);
 
+  //Valido q la fecha de inicio sea igual o posterior a la facha actual
+  const result = validateProjectStartDate(startDate);
 
-  const user = await modifyProject(userLoguedId, projectId, projectName,  startDate, endDate, description, objetive );
+  if (!result.valid) {
+    res.status(400).json({
+      success: false,
+      message: "La fecha de inicio del proyecto no puede ser anterior a hoy."
+    });
+  }
+
+  const user = await modifyProject(userLoguedId, projectId, projectName, startDate, endDate, description, objetive);
   res.status(200).json({
     success: true,
     message: "El proyecto ha sido modificado exitosamente"
@@ -133,16 +148,16 @@ export const addMemberToProject = catchAsync(async (req: Request, res: Response)
   const projectId = req.params.projectId;
   const userIds: string[] = req.body.userIds;
   await addMenmbers(userLoguedId, projectId, userIds);
-  if(userIds.length == 1){
-res.status(201).json({
-    success: true,
-    message: "Usuario asignado al proyecto exitosamente, se le ha enviado un email notificandolo."
-  });
-  }else{
+  if (userIds.length == 1) {
     res.status(201).json({
-    success: true,
-    message: "Usuarios asignados al proyecto exitosamente, se les ha enviado un email notificandolos."
-  });
+      success: true,
+      message: "Usuario asignado al proyecto exitosamente, se le ha enviado un email notificandolo."
+    });
+  } else {
+    res.status(201).json({
+      success: true,
+      message: "Usuarios asignados al proyecto exitosamente, se les ha enviado un email notificandolos."
+    });
   }
 })
 
@@ -165,11 +180,11 @@ export const getAllStages = catchAsync(async (req: Request, res: Response) => {
   const pageNumber = parseInt(req.query.pageNumber as string) || 0;
 
 
-const filters: StageFilter = {
-        pageNumber,
-        search: req.query.search as string,
-        status: req.query.status as StageStatusEnum || undefined,
-    };
+  const filters: StageFilter = {
+    pageNumber,
+    search: req.query.search as string,
+    status: req.query.status as StageStatusEnum || undefined,
+  };
 
   const stageList = await listStages(userLoguedId, projectId, filters);
 
@@ -177,7 +192,7 @@ const filters: StageFilter = {
     return res.status(200).json({
       success: true,
       //pageNumber,
-      message: 'No se encontraron etapas asociadas al proyecto.',
+      message: 'No se encontraron resultados.',
       data: []
     });
   }
@@ -196,7 +211,7 @@ export async function createStage(req: Request, res: Response): Promise<void> {
   const projectId = req.params.projectId;
   const stageName = req.body.stageName;
   const stageOrder = req.body.stageOrder;
-  
+
   const newProject = await addNewStage(userLoguedId, projectId, stageName, stageOrder);
   res.status(201).json({
     success: true,
@@ -204,12 +219,12 @@ export async function createStage(req: Request, res: Response): Promise<void> {
   });
 }
 
-export const getStageById = catchAsync(async(req: Request, res: Response)=>{
+export const getStageById = catchAsync(async (req: Request, res: Response) => {
 
- const { userLoguedId } = (req as any).user;
+  const { userLoguedId } = (req as any).user;
   const stageId = req.params.stageId;
   const oneStage = await getOneStage(userLoguedId, stageId);
- res.status(200).json({
+  res.status(200).json({
     success: true,
     data: oneStage
   });
@@ -223,7 +238,7 @@ export const updateStage = catchAsync(async (req: Request, res: Response) => {
   const stagetId = req.params.stageId;
   const stageName = req.body.stageName;
   const stageOrder = req.body.stageOrder;
-  
+
 
 
   const user = await modifyStage(userLoguedId, stagetId, stageName, stageOrder);
@@ -264,12 +279,12 @@ export const getAllProjectType = catchAsync(async (req: Request, res: Response) 
 })
 
 
-export const getAllUsersProject = catchAsync(async(req: Request, res: Response)=>{
+export const getAllUsersProject = catchAsync(async (req: Request, res: Response) => {
   const { userLoguedId } = (req as any).user;
-    const pageNumber = parseInt(req.query.pageNumber as string) || 0;
-   const projectId = req.params.projectId;
-   const usersList = await getAvailableUsersForProject(userLoguedId , projectId, pageNumber);
-    if (usersList.length === 0) {
+  const pageNumber = parseInt(req.query.pageNumber as string) || 0;
+  const projectId = req.params.projectId;
+  const usersList = await getAvailableUsersForProject(userLoguedId, projectId, pageNumber);
+  if (usersList.length === 0) {
     return res.status(200).json({
       success: true,
       pageNumber,
@@ -287,22 +302,22 @@ export const getAllUsersProject = catchAsync(async(req: Request, res: Response)=
 
 
 export async function getAllTask(req: Request, res: Response) {
-    const { userLoguedId } = (req as any).user;
+  const { userLoguedId } = (req as any).user;
 
-    const projectId = req.params.projectId
+  const projectId = req.params.projectId
 
-    const pageNumber = parseInt(req.query.pageNumber as string) || 0;
+  const pageNumber = parseInt(req.query.pageNumber as string) || 0;
 
-    const filters: TaskFilter = {
-        pageNumber,
-        search: req.query.search as string,
-        status: req.query.status as TaskStatusEnum || undefined,
-        priority: req.query.priority ? parseInt(req.query.priority as string) : undefined,
-    };
-    
-    const tasks = await listTask(userLoguedId, projectId, filters);
+  const filters: TaskFilter = {
+    pageNumber,
+    search: req.query.search as string,
+    status: req.query.status as TaskStatusEnum || undefined,
+    priority: req.query.priority ? parseInt(req.query.priority as string) : undefined,
+  };
 
-    if (tasks == null) {
+  const tasks = await listTask(userLoguedId, projectId, filters);
+
+  if (tasks == null) {
     return res.status(200).json({
       success: true,
       message: 'No se encontraron resultados.',
@@ -310,11 +325,11 @@ export async function getAllTask(req: Request, res: Response) {
     });
   }
 
-    return res.status(200).json({
-        success: true,
-        pageNumber,
-        data: tasks,
-    });
+  return res.status(200).json({
+    success: true,
+    pageNumber,
+    data: tasks,
+  });
 };
 
 
