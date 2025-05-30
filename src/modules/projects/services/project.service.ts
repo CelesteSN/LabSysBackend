@@ -33,7 +33,7 @@ import { TaskFilter } from "../dtos/taskFilters.dto";
 import { mapTasksToProjectDetailsDto, ProjectDetails1Dto } from "../dtos/allTask.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
 import { StageFilter } from "../dtos/stageFilters.dto";
-
+import { Comment } from "../models/comment.model"
 
 
 
@@ -535,9 +535,7 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
     ]
   });
 
-  if (!project) {
-    throw new NotFoundResultsError();
-  }
+  if (!project) throw new NotFoundResultsError();
 
   // 🔍 Obtener etapas del proyecto
   const projectStages = await Stage.findAll({
@@ -557,11 +555,10 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
     }
   });
 
-  console.log("Tareas a eliminar:", tasksToDelete.map(t => t.taskId));
-
-  // 🗑 Eliminar tareas (con comentarios en cascada)
+  // 🗑 Eliminar comentarios y luego tareas
   for (const task of tasksToDelete) {
-    await task.destroy();
+    await Comment.destroy({ where: { commentTaskId: task.taskId } }); // 🔁 Eliminar comentarios
+    await task.destroy(); // 🔁 Eliminar tarea
   }
 
   // ❌ Eliminar la relación del usuario con el proyecto
@@ -572,114 +569,18 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
     }
   });
 
-  if (!oneProjectUser) {
-    throw new NotFoundResultsError();
-  }
+  if (!oneProjectUser) throw new NotFoundResultsError();
 
   await oneProjectUser.destroy();
 
   // 🔁 Recalcular fechas de todas las etapas
   for (const stage of projectStages) {
     await updateStageDates(stage.stageId);
-    // También podrías llamar a updateStageProgress si lo tenés implementado
+    // También podrías llamar a updateStageProgress(stage.stageId);
   }
 
   return;
 }
-
-// export async function lowMember(userLoguedId: string, projectId: string, userId: string) {
-//   const userValidated = await validateActiveUser(userLoguedId);
-
-
-//   const userRole = await userValidated.getRole();
-
-//   // debe ser tutor
-//   if (!(userRole.roleName === RoleEnum.TUTOR)) {
-//     throw new ForbiddenAccessError()
-//   }
-
-//   //valido el usuario
-//   const memberValidated = await validateActiveUser(userId);
-
-
-//   //busco el proyecto
-//   const project = await Project.findOne({
-//     where: { "projectId": projectId },
-//     include: [
-//       {
-//         model: ProjectStatus,
-//         where: {
-//           projectStatusName: {
-//             [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-//           }
-//         },
-//       },
-//     ]
-
-//   });
-//   if (!project) {
-//     throw new NotFoundResultsError();
-//   }
-
-//   //busco el estado "Dada de baja" de la tarea
-
-
-//   const lowStatus = await TaskStatus.findOne({
-//     where: {
-//       taskStatusName: TaskStatusEnum.LOW
-//     }
-//   });
-//   if (!lowStatus) { throw new StatusNotFoundError };
-
-//   //eliminar tareas asociadas 
-//   const tasksToDelete = await Task.findAll({
-//     where: { taskUserId: userId },
-//     include: [{
-//       model: Stage,
-//       include: [{
-//         model: Project,
-//         where: {
-//           projectId: projectId
-//         }
-//       }]
-//     },
-//     ]
-//   });
-// console.log("Tareas encontradas para dar de baja:", tasksToDelete.map(t => t.taskId));
-//   for (const task of tasksToDelete) {
-//     await task.destroy();
-//     //await task.setTaskStatus(lowStatus.taskStatusId);
-//     //task.deletedDate = new Date();
-//   }
-
-//   //Elimino la las instancias de la tabla que realciona usuario y proyecto
-//   const oneProjectUser = await ProjectUser.findOne({
-//     where: {
-//       "projectUserProjectId": project.projectId,
-//       "projectUserUserId": userId,
-
-//     }
-//   });
-//   if (!oneProjectUser) {
-//     throw new NotFoundResultsError();
-//   }
-//   await oneProjectUser.destroy();
-
-//   // contar si no le quedan tareas a la etapa cambiarla a estaso pendiente y recalcular fechas
-// const allStagesOfProject = await Stage.findAll({
-//   where: {
-//     stageProjectId: projectId
-//   }
-// });
-
-// for (const stage of allStagesOfProject) {
-//   await updateStageDates(stage.stageId);
-//   //Agregar la llamada al metodo que calcula el progreso
-// }
-
-//   return
-// }
-
 
 
 export async function listStages(
@@ -814,7 +715,9 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
       {
         model: ProjectStatus,
         where: {
-          projectStatusName: ProjectStatusEnum.ACTIVE
+          projectStatusName: {
+            [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+          }
         }
       }]
 
@@ -972,50 +875,55 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
 
 
 export async function lowStage(userLoguedId: string, stageId: string) {
-
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
-  if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
-    throw new ForbiddenAccessError()
+  if (![RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum)) {
+    throw new ForbiddenAccessError();
   }
 
   const deletedStage = await Stage.findOne({
-    where: { stageId: stageId },
+    where: { stageId },
     include: [
       {
         model: StageStatus,
         where: {
-          stageStatusName: {
-            [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
+          stageStatusName: StageStatusEnum.PENDING
           }
-        },
-      },
+      }
     ]
-
   });
+
   if (!deletedStage) {
     throw new NotFoundResultsError();
   }
 
-  //Obtener el id de proyecto a partir de la etapa
+  // Obtener el proyecto de la etapa
   const projectStage = await deletedStage.getProject();
 
-  //Validar que este asignado al proyecto
+  // Validar membresía
   await validateProjectMembership(userLoguedId, projectStage.projectId);
 
-  //Elimino todas las tareas asociadas
-  await Task.destroy({
-    where: {
-      taskStageId: deletedStage.stageId
+  // 🔍 Obtener tareas asociadas a la etapa
+  const tasks = await Task.findAll({
+    where: { taskStageId: deletedStage.stageId }
+  });
 
-    }
-  })
-  deletedStage.destroy();
+  // 🔁 Eliminar comentarios y tareas una por una
+  for (const task of tasks) {
+    await Comment.destroy({
+      where: { commentTaskId: task.taskId }
+    });
 
-  return
+    await task.destroy();
+  }
 
+  // 🗑 Eliminar la etapa
+  await deletedStage.destroy();
+
+  return;
 }
+
 
 
 

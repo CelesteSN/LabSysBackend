@@ -435,6 +435,28 @@ export async function modifyTask(
 
   if (!validStatus) throw new StatusNotFoundError();
 
+  if(validStatus.taskStatusName == TaskStatusEnum.INPROGRESS || validStatus.taskStatusName == TaskStatusEnum.FINISHED){
+
+    //Busco el estado para la etapa y para el proyecto
+    const newStatusStage = await StageStatus.findOne({
+        where:{
+            stageStatusName : validStatus.taskStatusName
+        }
+    })
+    if(!newStatusStage){throw new ForbiddenAccessError("No se encontro el estado")}
+    await stageAux.setStageStatus(newStatusStage.stageStatusId);
+    const newStatusProject = await ProjectStatus.findOne({
+        where:{
+            projectStatusName : validStatus.taskStatusName
+        }
+    })
+
+    if(!newStatusProject){throw new ForbiddenAccessError("No se encontro el estado")}
+    await proy.setProjectStatus(newStatusProject.projectStatusId);
+  }
+
+
+
   // 🔎 Validar fechas antes de guardar
   const parsedStart = parse(taskStartDate, 'dd-MM-yyyy', new Date());
   const parsedEnd = parse(taskEndDate, 'dd-MM-yyyy', new Date());
