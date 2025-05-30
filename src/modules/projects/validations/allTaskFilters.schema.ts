@@ -12,7 +12,7 @@ export const AllTaskFiltersSchema = Joi.object({
     .valid(
       'Pendiente',
       'En progreso',
-     // 'Dado de baja',
+      'Dado de baja',
       'Finalizada',
       'Todos'
     )
@@ -29,9 +29,9 @@ export const AllTaskFiltersSchema = Joi.object({
     }),
     
   priority: Joi.number()
-    .valid(1, 2, 3)
+    .valid(0, 1, 2, 3)
     .messages({
-      'any.only': 'La prioridad debe ser 1 (Baja), 2 (Media) o 3 (Alta).',
+      'any.only': 'La prioridad debe ser 0 (Baja), 1 (Media), 2 (Alta) o 3 (urgente).',
       'number.base': 'La prioridad debe ser un número.'
     })
 });

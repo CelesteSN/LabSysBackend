@@ -145,6 +145,7 @@ import {
   Task.belongsTo(Stage, {
     //targetKey: "ptoject_type_id",
     foreignKey: 'taskStageId',
+    onDelete: 'CASCADE',
   });
 
   Stage.hasMany(Task,{

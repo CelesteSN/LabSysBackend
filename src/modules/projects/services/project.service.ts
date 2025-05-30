@@ -7,7 +7,7 @@ import { ProjectTypeEnum } from "../enums/projectType.enum";
 import { ProjectType } from "../models/projectType.model";
 import { randomUUID } from "crypto";
 import { User } from "../models/user.model"
-import { ForbiddenAccessError, UserNotFoundError, NameUsedError, NotFoundResultsError, StatusNotFoundError, OrderExistsError, NotValidDatesError, StageStatusNotFound , ProjectWithoutStagesError,NotFoundStagesError} from "../../../errors/customUserErrors";
+import { ForbiddenAccessError, UserNotFoundError, NameUsedError, NotFoundResultsError, StatusNotFoundError, OrderExistsError, NotValidDatesError, StageStatusNotFound, ProjectWithoutStagesError, NotFoundStagesError, NotFoundProjectError, BadRequestStartDateStageError, BadRequestEndDateStageError } from "../../../errors/customUserErrors";
 import { RoleEnum } from "../../users/enums/role.enum";
 import { Op } from "sequelize";
 import { ProjectFilter } from "../dtos/projectFilters.dto";
@@ -33,7 +33,7 @@ import { TaskFilter } from "../dtos/taskFilters.dto";
 import { mapTasksToProjectDetailsDto, ProjectDetails1Dto } from "../dtos/allTask.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
 import { StageFilter } from "../dtos/stageFilters.dto";
-
+import { Comment } from "../models/comment.model"
 
 
 
@@ -45,12 +45,12 @@ export async function listProjects(userLoguedId: string, filters: ProjectFilter)
   const whereConditions: any = {};
 
   const statusRaw = filters?.status?.trim();
-  const status = statusRaw ?? ProjectStatusEnum.ACTIVE;
+  const status = statusRaw ?? ProjectStatusEnum.INPROGRESS;
   const isStatusAll = status.toLowerCase() === ProjectStatusEnum.ALL.toLowerCase();
 
   if (filters?.search) {
     whereConditions[Op.or] = [
-      { projectName: { [Op.iLike]: `%${filters.search}%` } }, // corregido el typo
+      { projectName: { [Op.iLike]: `%${filters.search}%` } },
     ];
   }
 
@@ -59,7 +59,7 @@ export async function listProjects(userLoguedId: string, filters: ProjectFilter)
     where: whereConditions,
     attributes: ['projectId', 'projectName', 'projectStartDate', 'projectEndDate', 'createdDate'],
     include: [],
-    order: [["createdDate", "ASC"]],
+    order: [["createdDate", "DESC"]],
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
   };
@@ -100,7 +100,6 @@ export async function saveNewProject(userLoguedId: string, projectName: string, 
   const userRole = await userValidated.getRole();
   if (!(userRole.roleName == RoleEnum.TUTOR)) { throw new ForbiddenAccessError(); }
 
-
   //Valido que el nombre ingresado no exista
   const projectExists = await Project.findOne({
     where: {
@@ -108,10 +107,10 @@ export async function saveNewProject(userLoguedId: string, projectName: string, 
     },
   });
   if (projectExists) { throw new NameUsedError() };
+
   //obtengo el tipo de proyecto ingresado
   const type = await ProjectType.findByPk(projectTypeId);
-  if (!type) { throw new Error("No se encontró el estado ingresado"); }
-
+  if (!type) { throw new StatusNotFoundError(); }
 
   //obtengo el estado activo
   let status = await ProjectStatus.findOne({
@@ -119,10 +118,9 @@ export async function saveNewProject(userLoguedId: string, projectName: string, 
       "projectStatusName": ProjectStatusEnum.ACTIVE
     }
   });
-  // console.log(status?.userStatusName)
-  if (!status) {
-    throw new Error("Estado no encontrado");
 
+  if (!status) {
+    throw new StatusNotFoundError();
   }
 
   //creo el proyecto
@@ -141,12 +139,9 @@ export async function saveNewProject(userLoguedId: string, projectName: string, 
 
 
 
-
 export async function getProject(userLoguedId: string, projedId: string): Promise<OneProjectDto> {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
-
-
 
   if (!(await validateProjectMembershipWhitReturn(userValidated.userId, projedId) || userRole.roleName === RoleEnum.TUTOR)) {
     throw new ForbiddenAccessError()
@@ -171,9 +166,7 @@ export async function getProject(userLoguedId: string, projedId: string): Promis
     throw new NotFoundResultsError();
 
   }
-
   return mapOneProjectToDto(project);
-
 }
 
 
@@ -185,9 +178,9 @@ export async function validateProjectMembershipWhitReturn(userId: string, projec
       projectUserProjectId: projectId
     }
   });
-
   return !!membership; // retorna true si existe, false si no
 }
+
 
 
 export async function modifyProject(userLoguedId: string, projectId: string, name: string, startDate: string, endDate: string, description?: string, objetive?: string,): Promise<Project | null> {
@@ -204,15 +197,15 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
   await validateProjectMembership(userLoguedId, projectId);
 
   //Valido que el nombre ingresado no exista
-  const projectExists = await Project.findOne({
+  const projecNametExists = await Project.findOne({
     where: {
       projectName: name,
       projectId: { [Op.ne]: projectId }
     },
   });
-  if (projectExists) { throw new NameUsedError() };
+  if (projecNametExists) { throw new NameUsedError() };
 
-  //Debe estar en estado "Activo" o "Pendiente"
+  //Debe estar en estado "Activo" o "En progreso"
   const updatedProject = await Project.findOne({
     where: { "projectId": projectId },
     include: [
@@ -231,17 +224,17 @@ export async function modifyProject(userLoguedId: string, projectId: string, nam
   }
 
   updatedProject.projectName = name;
-  if (updatedProject.projectDescription != null) {
+  if (description != null) {
     updatedProject.projectDescription = description;
   };
-  if (updatedProject.projectObjetive != null) {
+  if (objetive != null) {
     updatedProject.projectObjetive = objetive;
   }
   updatedProject.updatedDate = new Date();
   updatedProject.projectStartDate = parse(startDate, 'dd-MM-yyyy', new Date()),
-    updatedProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
+  updatedProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
 
-    await updatedProject.save(); // Guardar los cambios en la base de datos
+  await updatedProject.save(); // Guardar los cambios en la base de datos
 
   return updatedProject;
 }
@@ -263,56 +256,106 @@ export function validateProjectDates(startDate: string, endDate: string): void {
 
 
 
-
-
 export async function lowproject(userLoguedId: string, projectId: string) {
-
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
-  if (!(userRole.roleName === RoleEnum.TUTOR)) {
-    throw new ForbiddenAccessError()
+  if (userRole.roleName !== RoleEnum.TUTOR) {
+    throw new ForbiddenAccessError();
   }
 
   const deletedproject = await Project.findOne({
-    where: { "projectId": projectId },
+    where: { projectId },
     include: [
       {
         model: ProjectStatus,
         where: {
           projectStatusName: {
-            [Op.or]: ["En progreso", "Activo"]
+            [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
-        },
-      },
+        }
+      }
     ]
-
   });
+
   if (!deletedproject) {
     throw new NotFoundResultsError();
   }
 
-  //Buscar el estado Dado de baja
-  const statusLow = await ProjectStatus.findOne({
-    where: {
-      'projectStatusName': ProjectStatusEnum.LOW
+  // 🔍 Buscar el estado "Dado de baja" del proyecto, etapa y tarea
+  const statusProjectLow = await ProjectStatus.findOne({
+    where: { projectStatusName: ProjectStatusEnum.LOW }
+  });
+
+  if (!statusProjectLow) {
+    throw new StatusNotFoundError();
+  }
+
+const statusStageLow = await StageStatus.findOne({
+    where: { stageStatusName: StageStatusEnum.LOW }
+  });
+
+  if (!statusStageLow) {
+    throw new StatusNotFoundError();
+  }
+
+const statusTaskLow = await TaskStatus.findOne({
+    where: { taskStatusName: TaskStatusEnum.LOW }
+  });
+
+  if (!statusTaskLow) {
+    throw new StatusNotFoundError();
+  }
+
+
+  // 🔁 Etapas del proyecto
+  const deleteStageList = await Stage.findAll({
+    where: { stageProjectId: projectId }
+  });
+
+  if (deleteStageList.length > 0) {
+    for (const stage of deleteStageList) {
+      // Marcar etapa como "Dado de baja"
+      await Stage.update(
+        {
+          stageStatusId: statusStageLow.stageStatusId,
+          deletedDate: new Date()
+        },
+        {
+          where: { stageId: stage.stageId }
+        }
+      );
+
+      // 🔁 Tareas de la etapa
+      const deleteTaskList = await Task.findAll({
+        where: { taskStageId: stage.stageId }
+      });
+
+      for (const task of deleteTaskList) {
+        await Task.update(
+          {
+            taskStatusId: statusTaskLow.taskStatusId,
+            deletedDate: new Date()
+          },
+          {
+            where: { taskId: task.taskId }
+          }
+        );
+      }
     }
   }
-  );
 
-  if (!statusLow) { throw new StatusNotFoundError() };
-
-  deletedproject.setProjectStatus(statusLow.projectStatusId)
-  deletedproject.deletedDate = new Date(); // Eliminar el usuario de la base de datos
+  // 🧨 Marcar el proyecto como "Dado de baja"
+  deletedproject.setProjectStatus(statusProjectLow.projectStatusId);
+  deletedproject.deletedDate = new Date();
   await deletedproject.save();
-  return
 
+  return;
 }
 
 
 export async function listMembers(userLoguedId: string, projectId: string) {
   const userValidated = await validateActiveUser(userLoguedId);
-
 
   const userRole = await userValidated.getRole();
 
@@ -320,8 +363,6 @@ export async function listMembers(userLoguedId: string, projectId: string) {
   if (userRole.roleName !== RoleEnum.TUTOR) {
     await validateProjectMembership(userLoguedId, projectId);
   }
-
-
 
   const project = await Project.findOne({
     where: {
@@ -361,69 +402,13 @@ export async function listMembers(userLoguedId: string, projectId: string) {
   }
 
 
-  //     {
-  //       model: User,
-  //       attributes: ['userFirstName', 'userLastName', 'userPersonalFile', 'userEmail'],
-  //       include: [{
-  //         model: Role,
-  //         attributes: ['roleName'],
-  //         required: true
-  //       }]
-  //     }
-  //   ]
-  // });
-  //console.log(JSON.stringify(members, null, 2)); // Verificá si aparece Role aquí
   const result = mapProjectToDetailsDto(project);
   return result
 
 };
 
 
-// export async function addMenmbers(userLoguedId: string, projectId: string, userId: string) {
-//   const userValidated = await validateActiveUser(userLoguedId);
 
-
-//   const userRole = await userValidated.getRole();
-
-//   // debe ser tutor
-//   if (!(userRole.roleName === RoleEnum.TUTOR)) {
-//     throw new ForbiddenAccessError()
-//   }
-
-//   //valido el ussuario
-//   const memberValidated = await validateActiveUser(userId);
-
-
-//   //busco el proyecto
-//   const project = await Project.findOne({
-//     where: { "projectId": projectId },
-//     include: [
-//       {
-//         model: ProjectStatus,
-//         where: {
-//           projectStatusName: {
-//             [Op.or]: ["En progreso", "Activo"]
-//           }
-//         },
-//       },
-//     ]
-
-//   });
-//   if (!project) {
-//     throw new NotFoundResultsError();
-//   }
-
-//   //Realizo la asignación
-//   const projectUser = await ProjectUser.build();
-//   projectUser.projectUserProjectId = project.projectId,
-//     projectUser.projectUserUserId = memberValidated.userId,
-//     projectUser.createdDate = new Date(),
-//     projectUser.updatedDate = new Date(),
-
-//     await projectUser.save();
-
-//   return
-// }
 export async function addMenmbers(userLoguedId: string, projectId: string, userIds: string[]) {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
@@ -525,24 +510,19 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
 
 
 
+
 export async function lowMember(userLoguedId: string, projectId: string, userId: string) {
   const userValidated = await validateActiveUser(userLoguedId);
-
-
   const userRole = await userValidated.getRole();
 
-  // debe ser tutor
-  if (!(userRole.roleName === RoleEnum.TUTOR)) {
-    throw new ForbiddenAccessError()
+  if (userRole.roleName !== RoleEnum.TUTOR) {
+    throw new ForbiddenAccessError();
   }
 
-  //valido el ussuario
   const memberValidated = await validateActiveUser(userId);
 
-
-  //busco el proyecto
   const project = await Project.findOne({
-    where: { "projectId": projectId },
+    where: { projectId },
     include: [
       {
         model: ProjectStatus,
@@ -550,65 +530,57 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
           projectStatusName: {
             [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
-        },
-      },
-    ]
-
-  });
-  if (!project) {
-    throw new NotFoundResultsError();
-  }
-
-    //busco el estado "Dada de baja" de la tarea
-
-
- const lowStatus = await TaskStatus.findOne({
-      where: {
-        taskStatusName : TaskStatusEnum.LOW
-      }
-    });
-    if(!lowStatus){throw new StatusNotFoundError};
-
-  //eliminar tareas asociadas 
-  const tasksToDelete = await Task.findAll({
-    where: { taskUserId: userId },
-    include: [{
-      model: Stage,
-      include: [{
-        model: Project,
-        where: {
-          projectId: projectId
         }
-      }]
-    },
-    ] 
+      }
+    ]
   });
 
-  for (const task of tasksToDelete) {
-    //await task.destroy();
-     await task.setTaskStatus(lowStatus.taskStatusId);
-     task.deletedDate = new Date();
-  }
+  if (!project) throw new NotFoundResultsError();
 
-//Elimino el proyecto
-  const oneProjectUser = await ProjectUser.findOne({
+  // 🔍 Obtener etapas del proyecto
+  const projectStages = await Stage.findAll({
+    where: { stageProjectId: projectId },
+    attributes: ['stageId']
+  });
+
+  const stageIds = projectStages.map(stage => stage.stageId);
+
+  // 🔁 Buscar tareas del usuario en esas etapas
+  const tasksToDelete = await Task.findAll({
     where: {
-      "projectUserProjectId": project.projectId,
-      "projectUserUserId": memberValidated.userId,
-
+      taskUserId: userId,
+      taskStageId: {
+        [Op.in]: stageIds
+      }
     }
   });
-  if (!oneProjectUser) {
-    throw new NotFoundResultsError();
+
+  // 🗑 Eliminar comentarios y luego tareas
+  for (const task of tasksToDelete) {
+    await Comment.destroy({ where: { commentTaskId: task.taskId } }); // 🔁 Eliminar comentarios
+    await task.destroy(); // 🔁 Eliminar tarea
   }
+
+  // ❌ Eliminar la relación del usuario con el proyecto
+  const oneProjectUser = await ProjectUser.findOne({
+    where: {
+      projectUserProjectId: projectId,
+      projectUserUserId: userId
+    }
+  });
+
+  if (!oneProjectUser) throw new NotFoundResultsError();
+
   await oneProjectUser.destroy();
 
-   
+  // 🔁 Recalcular fechas de todas las etapas
+  for (const stage of projectStages) {
+    await updateStageDates(stage.stageId);
+    // También podrías llamar a updateStageProgress(stage.stageId);
+  }
 
-// contar si no le quedan tareas a la etapa cambiarla a estaso pendiente y recalcular fechas
-  return
+  return;
 }
-
 
 
 export async function listStages(
@@ -628,11 +600,11 @@ export async function listStages(
     include: [
       {
         model: ProjectStatus,
-        where: {
-          projectStatusName: {
-            [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-          }
-        },
+        // where: {
+        //   projectStatusName: {
+        //     [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+        //   }
+        // },
       },
     ]
   });
@@ -693,71 +665,7 @@ export async function listStages(
 
 
 
-
-
-// export async function listStages(userLoguedId: string, projectId: string, filters: StageFilter): Promise<ProjectDetailsDto | null> {
-//   const userValidated = await validateActiveUser(userLoguedId);
-//   const userRole = await userValidated.getRole();
-
-//   if (userRole.roleName !== RoleEnum.TUTOR) {
-//     await validateProjectMembership(userLoguedId, projectId);
-//   }
-
-//   const project = await Project.findOne({
-//     where: { projectId },
-//     include: [
-//       {
-//         model: ProjectStatus,
-//         where: {
-//           projectStatusName: {
-//             [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
-//           }
-//         },
-//       },
-//     ]
-//   });
-
-//   if (!project) {
-//     throw new NotFoundResultsError();
-//   }
-
-//   const stageList = await Stage.findAll({
-//     where: { stageProjectId: project.projectId },
-//     include: [
-//       {
-//         model: StageStatus,
-//         attributes: ["stageStatusName"]
-//       },
-//       {
-//         model: Project,
-//         attributes: ["projectId"],
-//         include: [
-//           {
-//             model: ProjectStatus,
-//             attributes: ['projectStatusName'],
-//           }
-//         ]
-//       }
-//     ],
-
-
-//     order: [["stageOrder", "ASC"]],
-//     limit: parseInt(appConfig.ROWS_PER_PAGE),
-//     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-//   });
-
-//   if (stageList.length == 0) {
-//     //throw new NotFoundResultsError();
-//     return null
-//   }
-//   const result = mapStageToDto(stageList);
-//   return result
-// }
-
-
 export async function getOneStage(userLoguedId: string, stageId: string): Promise<OneStageDto> {
-
-
   const userValidated = await validateActiveUser(userLoguedId);
 
   const stage = await Stage.findOne({
@@ -800,7 +708,7 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
   //Valido si es miembro
   await validateProjectMembership(userLoguedId, projectId);
 
-  //Valido el proyecto ingresado
+  //Valido el proyecto ingresado: solo se pueden agregar etapas mientras en proyecto este activo
   const project = await Project.findOne({
     where: { projectId },
     include: [
@@ -810,42 +718,20 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
           projectStatusName: {
             [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
-        },
-      },
-    ]
+        }
+      }]
+
   });
 
   if (!project) {
-    throw new NotFoundResultsError();
+    throw new NotFoundProjectError();
   }
 
-//Valido que el proyecto este pendiente, si ya hay alguna etapa en progreso, solo puede egregar etapas al final
-
-// const allStagesInProject = await Stage.findAll({
-//   where:{
-//     stageProjectId : projectId
-//   },
-//   include: [
-//     {
-//       model: StageStatus,
-//       where:{
-//         stageStatusName:{
-//           [Op.or]:[StageStatusEnum.FINISHED, StageStatusEnum.INPROGRESS]
-//         }
-        
-//       }
-//     }
-//   ],
-// });
-// if(allStagesInProject){
-//   throw new StageStatusNotFound();
-// }
-
- //Valido que el nombre ingresado no exista
+    //Valido que el nombre ingresado no exista
   const stageExists = await Stage.findOne({
     where: {
-      "stageName": stageName,
-      "stageProjectId": projectId
+      stageName: stageName,
+      stageProjectId : projectId
     },
   });
   if (stageExists) { throw new NameUsedError() };
@@ -853,8 +739,8 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
   //valido el orden
   const orderExist = await Stage.findOne({
     where: {
-      "stageOrder": stageOrder,
-      "stageProjectId": projectId
+      stageOrder: stageOrder,
+      stageProjectId: projectId
     }
   })
   if (orderExist) { throw new OrderExistsError() };
@@ -862,7 +748,7 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
   //obtengo el estado pendiente
   let status = await StageStatus.findOne({
     where: {
-      "stageStatusName": StageStatusEnum.PENDING
+      stageStatusName: StageStatusEnum.PENDING
     }
   });
   // console.log(status?.userStatusName)
@@ -874,7 +760,7 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
   //creo la etapa
   const newStage = await Stage.build();
   newStage.stageName = stageName,
-    newStage.stageOrder = stageOrder,//validar
+    newStage.stageOrder = stageOrder,
     newStage.createdDate = new Date(),
     newStage.updatedDate = new Date(),
     newStage.stageStatusId = status.stageStatusId,
@@ -967,7 +853,7 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
   //valido el orden
   const orderExist = await Stage.findOne({
     where: {
-      "stageOrder": stageOrder,
+      stageOrder: stageOrder,
       stageProjectId: pro.projectId,
       stageId: { [Op.ne]: stageId } // excluye la etapa actual
 
@@ -989,59 +875,55 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
 
 
 export async function lowStage(userLoguedId: string, stageId: string) {
-
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
-  if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
-    throw new ForbiddenAccessError()
+  if (![RoleEnum.BECARIO, RoleEnum.PASANTE].includes(userRole.roleName as RoleEnum)) {
+    throw new ForbiddenAccessError();
   }
 
   const deletedStage = await Stage.findOne({
-    where: { "stageId": stageId },
+    where: { stageId },
     include: [
       {
         model: StageStatus,
         where: {
-          stageStatusName: {
-            [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
+          stageStatusName: StageStatusEnum.PENDING
           }
-        },
-      },
+      }
     ]
-
   });
+
   if (!deletedStage) {
     throw new NotFoundResultsError();
   }
 
-  //Obtener el id de proyecto a partir de la etapa
-
+  // Obtener el proyecto de la etapa
   const projectStage = await deletedStage.getProject();
 
-
-  //Validar que este asignado al proyecto
+  // Validar membresía
   await validateProjectMembership(userLoguedId, projectStage.projectId);
 
-  deletedStage.destroy();
-  //ELIMINAR TODAS LAS TAREAS ASOCIADAS
-  // //Buscar el estado Dado de baja
-  // const statusLow = await ProjectStatus.findOne({
-  //   where: {
-  //     'projectStatusName': ProjectStatusEnum.LOW
-  //   }
-  // }
-  // );
+  // 🔍 Obtener tareas asociadas a la etapa
+  const tasks = await Task.findAll({
+    where: { taskStageId: deletedStage.stageId }
+  });
 
-  // if (!statusLow) { throw new StatusNotFoundError() };
+  // 🔁 Eliminar comentarios y tareas una por una
+  for (const task of tasks) {
+    await Comment.destroy({
+      where: { commentTaskId: task.taskId }
+    });
 
+    await task.destroy();
+  }
 
-  // deletedproject.setProjectStatus(statusLow.projectStatusId)
-  // deletedproject.deletedDate = new Date(); // Eliminar el usuario de la base de datos
-  // await deletedproject.save();
-  return
+  // 🗑 Eliminar la etapa
+  await deletedStage.destroy();
 
+  return;
 }
+
 
 
 
@@ -1059,7 +941,7 @@ export async function getAvailableUsersForProject(userLoguedId: string, projectI
 
   if (userRole.roleName !== RoleEnum.TUTOR) {
     //await validateProjectMembership(userLoguedId, projectId);
-        throw new ForbiddenAccessError()
+    throw new ForbiddenAccessError()
   }
   // Obtener IDs de usuarios ya asignados al proyecto
   const assignedUsers = await ProjectUser.findAll({
@@ -1107,9 +989,7 @@ export async function listTask(userLoguedId: string, projectId: string, filters:
     await validateProjectMembership(userLoguedId, projectId);
   }
 
-  //await validateProjectMembership(userLoguedId, projectId);
-
-  const whereConditions: any = {};
+    const whereConditions: any = {};
 
   // Filtro por búsqueda
   if (filters?.search) {
@@ -1119,21 +999,20 @@ export async function listTask(userLoguedId: string, projectId: string, filters:
   }
 
   // Filtro por prioridad
-  if (filters?.priority) {
-    whereConditions.taskPriority = filters.priority;
-  }
-
-// Paso 1: Verificar si el proyecto tiene etapas
-const stages = await Stage.findAll({
-  where: { stageProjectId: projectId },
-  attributes: ['stageId']
-});
-
-if (stages.length === 0) {
-  throw new NotFoundStagesError();
+if (filters?.priority != null) {
+  whereConditions.taskPriority = filters.priority;
 }
 
+  // Paso 1: Verificar si el proyecto tiene etapas
+  const stages = await Stage.findAll({
+    where: { stageProjectId: projectId },
+    attributes: ['stageId']
+  });
 
+  if (stages.length === 0) {
+    //throw new NotFoundStagesError();
+    return null;
+  }
 
   const taskList = await Task.findAll({
     where: whereConditions,
@@ -1166,6 +1045,7 @@ if (stages.length === 0) {
       {
         model: Stage,
         required: true, // Solo trae tareas que tienen Stage
+
         attributes: ["stageName", "stageOrder"],
         include: [
           {
@@ -1192,14 +1072,107 @@ if (stages.length === 0) {
   });
 
   // Verificaciones
-if (!taskList) throw new NotFoundResultsError();
+  if (!taskList) throw new NotFoundResultsError();
 
-if (taskList.length === 0) return null;
+  if (taskList.length === 0) return null;
 
-const allStagesAreNull = taskList.every(t => t.Stage === null);
-if (allStagesAreNull) {
-  throw new ProjectWithoutStagesError ();
-}
+  const allStagesAreNull = taskList.every(t => t.Stage === null);
+  if (allStagesAreNull) {
+    //throw new ProjectWithoutStagesError ();
+    return null
+  }
   const result = mapTasksToProjectDetailsDto(taskList);
   return result;
+}
+
+
+
+export function validateProjectStartDate(projectStartDate: string): { valid: boolean } {
+  // Parsing seguro desde formato dd-mm-yyyy
+  const [dd, mm, yyyy] = projectStartDate.split("-").map(Number);
+
+  if (!dd || !mm || !yyyy) {
+    throw new NotValidDatesError
+
+  }
+
+  const fechaInicio = new Date(yyyy, mm - 1, dd);
+  fechaInicio.setHours(0, 0, 0, 0);
+
+  if (isNaN(fechaInicio.getTime())) {
+    throw new NotValidDatesError
+  };
+
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  if (fechaInicio < hoy) {
+    return {
+      valid: false,
+    };
+  }
+
+  return { valid: true };
+}
+
+
+
+export async function updateStageDates(stageId: string): Promise<void> {
+    // Obtener la etapa con su proyecto
+    const stage = await Stage.findByPk(stageId, {
+        include: [{
+            model: Project,
+            attributes: ["projectStartDate", "projectEndDate"]
+        }]
+    });
+
+    if (!stage || !stage.Project) {
+        throw new Error("No se encontró la etapa o el proyecto asociado.");
+    }
+
+    const projectStart = stage.Project.projectStartDate;
+    const projectEnd = stage.Project.projectEndDate;
+
+    // Obtener todas las tareas de la etapa
+    const tasks = await Task.findAll({
+        where: { taskStageId: stageId },
+        attributes: ["taskStartDate", "taskEndDate"]
+    });
+
+    if (tasks.length === 0) {
+        await Stage.update(
+            {
+                stageStartDate: null,
+                stageEndDate: null
+            },
+            { where: { stageId } }
+        );
+        return;
+    }
+
+    // Obtener fechas mínimas y máximas
+    const startDates = tasks.map(t => t.taskStartDate).filter(Boolean) as Date[];
+    const endDates = tasks.map(t => t.taskEndDate).filter(Boolean) as Date[];
+
+    const minStartDate = startDates.length ? new Date(Math.min(...startDates.map(d => d.getTime()))) : null;
+    const maxEndDate = endDates.length ? new Date(Math.max(...endDates.map(d => d.getTime()))) : null;
+
+    // Validar límites del proyecto
+    if (minStartDate && projectStart && minStartDate < projectStart) {
+        throw new BadRequestStartDateStageError();
+    }
+
+    if (maxEndDate && projectEnd && maxEndDate > projectEnd) {
+        throw new BadRequestEndDateStageError();
+    }
+
+    // Actualizar etapa
+    await Stage.update(
+        {
+            stageStartDate: minStartDate,
+            stageEndDate: maxEndDate
+        },
+        { where: { stageId } }
+    );
 }
