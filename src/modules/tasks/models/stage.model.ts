@@ -105,7 +105,8 @@ Stage.init(
 
 // Relaciones
 Stage.belongsTo(Project, {
-  foreignKey: "stageProjectId"
+  foreignKey: "stageProjectId",
+  onDelete: 'CASCADE',
 });
 Project.hasMany(Stage, {
   foreignKey: "stageProjectId"
