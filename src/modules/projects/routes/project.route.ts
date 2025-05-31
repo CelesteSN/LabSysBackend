@@ -12,6 +12,7 @@ import {stageSchema} from "../validations/createStage.schema";
 import {AllTaskFiltersSchema} from "../validations/allTaskFilters.schema";
 import {AllStageFiltersSchema} from "../validations/allStagesFilters.schema";
 import {getAllAttachment} from "../../tasks/controllers/attachment.controller";
+import { attachmentFilterSchema } from "../../tasks/schemas/allAttachmentFulter.schema";
 
 
 
@@ -21,9 +22,7 @@ export const projectRouter = Router();
 
 //Ruta para listado de adjuntos
 
-projectRouter.get('/:projectId/attachments', authenticateToken, checkBlacklist,
-    // validateRequest({query: AllTaskFiltersSchema}),
-     getAllAttachment);
+projectRouter.get('/:projectId/attachments', authenticateToken, checkBlacklist,validateRequest({query: attachmentFilterSchema}), getAllAttachment);
 
 
 //Ruta para listado de tareas

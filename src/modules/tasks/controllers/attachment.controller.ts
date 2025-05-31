@@ -42,8 +42,9 @@
 //   });
 // };
 import { Request, Response } from "express";
-import { uploadTaskAttachment, attachmentList, getAttachmentStream } from "../services/attachment.service";
+import { uploadTaskAttachment, listAttachmentsByProject, getAttachmentStream } from "../services/attachment.service";
 import { AuthRequest } from "../../../middlewares/auth.middleware"; // Ajustá la ruta si es distinta
+import { AttachmentFilter } from "../dtos/allAttachmentFilter.dto";
 
 
 
@@ -63,18 +64,15 @@ export const handleTaskFileUpload = async (req: AuthRequest, res: Response) => {
 
 
   if (!file) {
-    return res.status(400).json({ error: "No se subió ningún archivo" });
+    return res.status(400).json({ message: "No se adjuntó ningún archivo" });
   }
 
-  try {
     const attachment = await uploadTaskAttachment(taskId, userLoguedId, file, description);
     return res.status(201).json({
-      message: "Archivo subido y asociado a la tarea",
-      attachment
+      message: "El archivo  fue subido exitosamente",
+      //attachment
     });
-  } catch (error: any) {
-    return res.status(400).json({ error: error.message });
-  }
+  
 };
 
 
@@ -103,17 +101,15 @@ export async function getAllAttachment(req: Request, res: Response) {
 
   const pageNumber = parseInt(req.query.pageNumber as string) || 0;
 
-  // const filters: TaskFilter = {
-  //   pageNumber,
-  //   search: req.query.search as string,
+   const filters: AttachmentFilter = {
+    pageNumber,
+  search: req.query.search as string,
   //   status: req.query.status as TaskStatusEnum || undefined,
   // priority: req.query.priority != null ? Number(req.query.priority) : undefined,
-  // };
+ };
   
 
-  const attachments = await attachmentList(userLoguedId, projectId, 
-    //filters
-  );
+  const attachments = await listAttachmentsByProject(userLoguedId, projectId,filters  );
 
   if (attachments == null) {
     return res.status(200).json({
