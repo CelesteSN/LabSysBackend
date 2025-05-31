@@ -11,12 +11,23 @@ import {deleteMemberSchema} from "../validations/deleteMember.validation";
 import {stageSchema} from "../validations/createStage.schema";
 import {AllTaskFiltersSchema} from "../validations/allTaskFilters.schema";
 import {AllStageFiltersSchema} from "../validations/allStagesFilters.schema";
+import {getAllAttachment} from "../../tasks/controllers/attachment.controller";
 
 
 
 export const projectRouter = Router();
 // 🟢 Rutas más específicas van primero
 // 🔵 Luego las más generales
+
+//Ruta para listado de adjuntos
+
+projectRouter.get('/:projectId/attachments', authenticateToken, checkBlacklist,
+    // validateRequest({query: AllTaskFiltersSchema}),
+     getAllAttachment);
+
+
+//Ruta para listado de tareas
+
 projectRouter.get('/:projectId/tasks', authenticateToken, checkBlacklist, validateRequest({query: AllTaskFiltersSchema}), getAllTask);
 
 //tipo de proyectos
