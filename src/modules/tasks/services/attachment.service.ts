@@ -58,11 +58,14 @@ export async function listAttachmentsByProject(
       },
       {
         model: Task,
+        required: true,
         attributes: ["taskTitle"],
         include: [{
           model: Stage,
+          required: true,
           include: [{
             model: Project,
+            required: true,
             where: { projectId },
             attributes: ["projectId"],
             include: [{
@@ -80,8 +83,9 @@ export async function listAttachmentsByProject(
   });
 
   if (attachmentList.length === 0) return null;
+  const result = await mapAttachmentsToProjectDto(attachmentList);
+    return result
 
-  return mapAttachmentsToProjectDto(attachmentList);
 }
 
 
