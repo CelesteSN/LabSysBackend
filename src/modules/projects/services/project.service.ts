@@ -125,13 +125,13 @@ export async function saveNewProject(userLoguedId: string, projectName: string, 
 
   //creo el proyecto
   const newProject = await Project.build();
-  newProject.projectName = projectName,
+    newProject.projectName = projectName,
     newProject.projectStartDate = parse(startDate, 'dd-MM-yyyy', new Date()),
     newProject.projectEndDate = parse(endDate, 'dd-MM-yyyy', new Date()),
     newProject.createdDate = new Date(),
     newProject.updatedDate = new Date(),
     newProject.projectStatusId = status.projectStatusId
-  newProject.projectTypeId = type.projectTypeId;
+    newProject.projectTypeId = type.projectTypeId;
 
   await newProject.save()
   return newProject;
@@ -1087,34 +1087,30 @@ if (filters?.priority != null) {
 
 
 
-export function validateProjectStartDate(projectStartDate: string): { valid: boolean } {
-  // Parsing seguro desde formato dd-mm-yyyy
+
+
+export function validateProjectStartDate(projectStartDate: string): void {
   const [dd, mm, yyyy] = projectStartDate.split("-").map(Number);
 
   if (!dd || !mm || !yyyy) {
-    throw new NotValidDatesError
-
+    throw new ForbiddenAccessError("Fecha con formato inválido (esperado dd-mm-yyyy)");
   }
 
   const fechaInicio = new Date(yyyy, mm - 1, dd);
   fechaInicio.setHours(0, 0, 0, 0);
 
   if (isNaN(fechaInicio.getTime())) {
-    throw new NotValidDatesError
-  };
-
+    throw new ForbiddenAccessError("Fecha inválida");
+  }
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
   if (fechaInicio < hoy) {
-    return {
-      valid: false,
-    };
+    throw new ForbiddenAccessError("La fecha de inicio del proyecto no puede ser anterior a hoy");
   }
-
-  return { valid: true };
 }
+
 
 
 
