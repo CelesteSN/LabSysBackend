@@ -9,8 +9,8 @@ import {createCommentSchema} from "../schemas/createComment.schema";
 import {updateCommentSchema} from "../schemas/updateComment.schema";
 import {AllCommentFiltersSchema} from "../schemas/allCommentFilter.schema";
 import { upload } from "../../../middlewares/upload.middleware";
-import { handleTaskFileUpload } from "../controllers/attachment.controller";
-import { downloadAttachment } from '../controllers/attachment.controller';
+import { deleteAttachment, handleTaskFileUpload , downloadAttachment} from "../controllers/attachment.controller";
+
 
 import cloudinaryUpload from '../../../config/cloudinary.storage';
 
@@ -18,10 +18,10 @@ import cloudinaryUpload from '../../../config/cloudinary.storage';
 export const taskRouter = Router();
 
 //Rutas de adjuntos
-
+taskRouter.get('/attachments/:attachmentId/download', authenticateToken, checkBlacklist, downloadAttachment);
 taskRouter.post("/:taskId/upload",authenticateToken, checkBlacklist,cloudinaryUpload.single('file'), handleTaskFileUpload);
-//taskRouter.post("/:taskId/upload",cloudinaryUpload.single('file'), handleTaskFileUpload);
-taskRouter.get('/attachments/:attachmentId/download', downloadAttachment);
+taskRouter.delete("/attachments/:attachmentId",authenticateToken, checkBlacklist, deleteAttachment);
+
 
 
 //Rutas de comentario

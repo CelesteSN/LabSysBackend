@@ -171,12 +171,27 @@ if (!allowedMimeTypes.includes(file.mimetype)) {
 
 
 
-export async function getAttachmentStream(attachmentId: string) {
+export async function getAttachmentStream(userLoguedId: string, attachmentId: string) {
+  
+  const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
+
+ 
+  
+  
   const attachment = await Attachment.findByPk(attachmentId);
   if (!attachment) {
-    throw new Error('Archivo no encontrado');
+    throw new ForbiddenAccessError('Archivo no encontrado');
   }
 
+
+   // 🔒 Verificar si el usuario es responsable de la tarea (si no es tutor)
+  if (userRole.roleName !== RoleEnum.TUTOR) {
+    const task = await attachment.getTask();
+    if (task.taskUserId !== userLoguedId) {
+      throw new ForbiddenAccessError("No tiene permiso para descargar archivos");
+    }
+  }
   const response = await axios.get(attachment.attachmentFileLink, {
     responseType: 'stream',
   });
@@ -189,19 +204,21 @@ export async function getAttachmentStream(attachmentId: string) {
 }
 
 
+export async function lowAttachment(userLoguedId: string, attachmentId: string): Promise<void> {
+    const userValidated = await validateActiveUser(userLoguedId);
+    const userRole = await userValidated.getRole();
 
-
-
-export async function deleteAttachment(attachmentId: string, userLoguedId: string): Promise<void> {
   // 1. Buscar el adjunto con info del usuario
   const attachment = await Attachment.findOne({
-    where: { attachmentId },
-    include: [
-      {
-        association: "User", // o el alias definido en tu modelo
-        attributes: ["userId"]
-      }
-    ]
+    where: { attachmentId: attachmentId,
+      //attachmentUserId: userLoguedId
+    },
+    // include: [
+    //   {
+    //     association: "User", // o el alias definido en tu modelo
+    //     attributes: ["userId"]
+    //   }
+    // ]
   });
 
   if (!attachment) {
