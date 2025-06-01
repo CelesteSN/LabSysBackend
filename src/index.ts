@@ -1,3 +1,5 @@
+import dotenv from "dotenv";
+dotenv.config();
 import express from "express";
 import { sequelize } from "./config/database";
 import cors from "cors";
@@ -7,17 +9,16 @@ import authRoutes from "./modules/security/routes/auth.route";
 import "express-async-errors"; // MUY IMPORTANTE para capturar errores async
 import { errorHandler } from "./middlewares/errorHandler";
 import { notificationRouter } from "./modules/notifications/routes/notification.route";
-import dotenv from "dotenv";
 import {projectRouter} from "./modules/projects/routes/project.route";
 import { taskRouter } from "./modules/tasks/routes/task.route";
 //import {connectToDatabase} from './config/database2';
-dotenv.config();
-import path from "path";
-import { ENV } from "./config/env";
+
+// import path from "path";
+// import { ENV } from "./config/env";
 
 const app = express();
 // Middleware para servir archivos estáticos
-app.use("/uploads", express.static(path.join(__dirname, `../${ENV.UPLOADS_PATH}`)));
+//app.use("/uploads", express.static(path.join(__dirname, `../${ENV.UPLOADS_PATH}`)));
 
 
 app.use(express.json());

@@ -41,7 +41,6 @@ export async function getAllProjects(req: Request, res: Response) {
 
 
 export async function createProject(req: Request, res: Response): Promise<void> {
-
   const { userLoguedId } = (req as any).user;
   const projectName = req.body.projectName;
   const projectTypeId = req.body.projectTypeId;
@@ -51,23 +50,18 @@ export async function createProject(req: Request, res: Response): Promise<void> 
   // Validar fechas
   await validateProjectDates(startDate, endDate);
 
-  //Valido q la fecha de inicio sea igual o posterior a la facha actual
-  const result = validateProjectStartDate(startDate);
-
-  if (!result.valid) {
-    res.status(400).json({
-      success: false,
-      message: "La fecha de inicio del proyecto no puede ser anterior a hoy."
-    });
-  }
-
+  // Validar que la fecha de inicio no sea anterior a hoy
+   await validateProjectStartDate(startDate);
+  
 
   const newProject = await saveNewProject(userLoguedId, projectName, projectTypeId, startDate, endDate);
-  res.status(201).json({
+   res.status(201).json({
     success: true,
     message: "El proyecto ha sido creado exitosamente."
   });
+  
 }
+
 
 
 export const getProjectById = catchAsync(async (req: Request, res: Response) => {
@@ -94,15 +88,8 @@ export const updateProject = catchAsync(async (req: Request, res: Response) => {
   await validateProjectDates(startDate, endDate);
 
   //Valido q la fecha de inicio sea igual o posterior a la facha actual
-  const result = validateProjectStartDate(startDate);
-
-  if (!result.valid) {
-    res.status(400).json({
-      success: false,
-      message: "La fecha de inicio del proyecto no puede ser anterior a hoy."
-    });
-  }
-
+   await validateProjectStartDate(startDate);
+   
   const user = await modifyProject(userLoguedId, projectId, projectName, startDate, endDate, description, objetive);
   res.status(200).json({
     success: true,
@@ -131,7 +118,7 @@ export const getMembers = catchAsync(async (req: Request, res: Response) => {
   if (!members.members || members.members.length === 0) {
     return res.status(200).json({
       success: true,
-      message: "No se encontraron resultados",
+      //message: "No se encontraron resultados",
       data: members,
     });
   }
@@ -192,7 +179,7 @@ export const getAllStages = catchAsync(async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       //pageNumber,
-      message: 'No se encontraron resultados.',
+      //message: 'No se encontraron resultados.',
       data: []
     });
   }
@@ -288,7 +275,7 @@ export const getAllUsersProject = catchAsync(async (req: Request, res: Response)
     return res.status(200).json({
       success: true,
       pageNumber,
-      message: 'No se encontraron usuarios.',
+      //message: 'No se encontraron usuarios.',
       data: []
     });
   }
