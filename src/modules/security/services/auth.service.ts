@@ -6,7 +6,7 @@ import { appConfig } from '../../../config/app';
 import { UserStatusEnum } from '../enums/userStatus.enum';
 //import { sendTemplatedEmail } from '../../notifications/services/notification.service';
 // src/modules/security/services/auth.service.ts
-import { sendEmail } from '../../notifications/services/notification.service';
+import { renderTemplate, sendEmail } from '../../notifications/services/notification.service';
 // import { generateRecoveryToken } from './auth.utils'; // si usás JWT
 // src/modules/security/services/auth.service.ts
 import { BlackListToken } from '../models/blackListToken.model';
@@ -131,11 +131,6 @@ if(!(userStatus.userStatusName == UserStatusEnum.ACTIVE)){throw new Error("Usuar
   // `;
 
   // await sendEmail(email, 'Recuperación de contraseña', html);
-
-
-
-
-
   // Obtener plantilla de recuperación
   const template = await NotificationTemplate.findOne({
     where: { notificationTemplateName: "RECOVERY_PASSWORD" }
@@ -147,10 +142,12 @@ if(!(userStatus.userStatusName == UserStatusEnum.ACTIVE)){throw new Error("Usuar
 
   // Construir el cuerpo con reemplazos
  // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
-  const html = template.notificationTemplateDescription
-    .replace("{{userFirstName}}", user.userFirstName)
-    .replace("{{recoveryLink}}", template.notificationTemplatelinkRedirect);
+ const recoveryLink = `https://tu-app.com/reset-password/${token}`;
 
+const html = await renderTemplate(template.notificationTemplateDescription, {
+  userFirstName: user.userFirstName,
+  recoveryLink: recoveryLink
+});
 
      await sendEmail(email, template.notificationTemplateEmailSubject, html);
 
