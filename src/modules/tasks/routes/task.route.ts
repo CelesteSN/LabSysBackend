@@ -1,5 +1,5 @@
 import { Router } from "express";
-import {  createTask, getTaskById, updateTask, deleteTask, getAllComments, createComment, updateComment, deleteComment, getCommentById} from "../controllers/task.controller";
+import {  createTask, getTaskById, updateTask, deleteTask, getAllComments, createComment, updateComment, deleteComment, getCommentById, getAllTaskStatus} from "../controllers/task.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { createTaskSchema } from '../schemas/createTask.schema';
@@ -32,6 +32,7 @@ taskRouter.put("/comments/:commentId", authenticateToken, checkBlacklist, valida
 taskRouter.delete("/comments/:commentId", authenticateToken, checkBlacklist, deleteComment);
 
 //Rutas de tareas
+taskRouter.get("/taskStatus",authenticateToken, checkBlacklist, getAllTaskStatus);
 taskRouter.post("/", authenticateToken, validateRequest({ body: createTaskSchema }), createTask);
 taskRouter.get("/:taskId", authenticateToken, checkBlacklist, getTaskById);
 taskRouter.put("/:taskId", authenticateToken, checkBlacklist, validateRequest({ body: updateTaskSchema }), updateTask);
