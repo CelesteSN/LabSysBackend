@@ -16,6 +16,8 @@ import { sendEmail } from '../../notifications/services/notification.service';
 import { AllRoleDto, mapRoleToDto } from '../dtos/allRole.dto';
 import { ResponseUserEnum } from "../enums/responseUser.enum";
 import { appConfig } from "../../../config/app";
+import { NotificationTemplate } from "../../notifications/models/notificationTemplate.model";
+import { NotificationEmail } from "../../notifications/models/notificationEmail.model";
 
 
 
@@ -130,82 +132,147 @@ import { appConfig } from "../../../config/app";
 
 
 
+// export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
+//   // Validar usuario activo
+//   const userValidated = await validateActiveUser(userLoguedId);
+//   const roleUser = await userValidated.getRole();
+
+//   if (roleUser?.roleName !== RoleEnum.TUTOR) {
+//     throw new ForbiddenAccessError();
+//   }
+
+//   // Construcción dinámica del where
+//   const whereConditions: any = {};
+
+//   // Search siempre independiente
+//   if (filters?.search?.trim()) {
+//     const search = filters.search.trim();
+//     whereConditions[Op.or] = [
+//       { userFirstName: { [Op.iLike]: `%${search}%` } },
+//       { userLastName: { [Op.iLike]: `%${search}%` } }
+//     ];
+//   }
+
+//   // Rango de fechas opcional
+//   if (filters?.fromDate) {
+//     whereConditions.createdDate = {
+//       ...whereConditions.createdDate,
+//       [Op.gte]: filters.fromDate,
+//     };
+//   }
+
+//   if (filters?.toDate) {
+//     whereConditions.createdDate = {
+//       ...whereConditions.createdDate,
+//       [Op.lte]: filters.toDate,
+//     };
+//   }
+
+//   // Procesar filtros de status y rol
+//   const statusRaw = filters?.status?.trim();
+//   const status = statusRaw ?? UserStatusEnum.PENDING;
+//   const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
+
+//   const normalizedRole = filters?.role?.trim();
+//   const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== "todos";
+
+//   const includeOptions = [
+//     {
+//       model: UserStatus,
+//       attributes: ["userStatusName"],
+//       ...(isStatusAll ? {} : { where: { userStatusName: status } })
+//     },
+//     {
+//       model: Role,
+//       attributes: ["roleName"],
+//       ...(isSpecificRole
+//         ? { where: { roleName: normalizedRole } }
+//         : { where: { roleName: { [Op.not]: RoleEnum.TUTOR } } })
+//     }
+//   ];
+
+//   const users = await User.findAll({
+//     where: whereConditions,
+//     attributes: ["userId", "userFirstName", "userLastName", "createdDate"],
+//     include: includeOptions,
+//     order: [["createdDate", "Desc"]],
+//     limit: parseInt(appConfig.ROWS_PER_PAGE),
+//     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
+//   });
+
+//   return users.map(mapUserToDto);
+// }
+
+
+
+
 export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
-  // Validar usuario activo
   const userValidated = await validateActiveUser(userLoguedId);
   const roleUser = await userValidated.getRole();
+  if (roleUser?.roleName !== RoleEnum.TUTOR) throw new ForbiddenAccessError();
 
-  if (roleUser?.roleName !== RoleEnum.TUTOR) {
-    throw new ForbiddenAccessError();
-  }
+  // Normalizar entradas
+  const search = filters?.search?.trim();
+  const role = filters?.role?.trim();
+  const status = filters?.status?.trim();
+  const fromDate = filters?.fromDate;
+  const toDate = filters?.toDate;
 
-  // Construcción dinámica del where
-  const whereConditions: any = {};
+  const applySearch = !!search && search.length >= 3;
+  const applyRole = !!role;
+  const applyStatus = !!status;
 
-  // Search siempre independiente
-  if (filters?.search?.trim()) {
-    const search = filters.search.trim();
-    whereConditions[Op.or] = [
+  // WHERE principal (User)
+  const where: any = {};
+
+  // 🔍 Search: por nombre o apellido (mínimo 3 letras)
+  if (applySearch) {
+    where[Op.or] = [
       { userFirstName: { [Op.iLike]: `%${search}%` } },
       { userLastName: { [Op.iLike]: `%${search}%` } }
     ];
   }
 
-  // Rango de fechas opcional
-  if (filters?.fromDate) {
-    whereConditions.createdDate = {
-      ...whereConditions.createdDate,
-      [Op.gte]: filters.fromDate,
-    };
+  // 📅 Fechas
+  if (fromDate) {
+    where.createdDate = { ...where.createdDate, [Op.gte]: fromDate };
+  }
+  if (toDate) {
+    where.createdDate = { ...where.createdDate, [Op.lte]: toDate };
   }
 
-  if (filters?.toDate) {
-    whereConditions.createdDate = {
-      ...whereConditions.createdDate,
-      [Op.lte]: filters.toDate,
-    };
-  }
+  // 👥 Include (UserStatus y Role)
+  const include: any[] = [];
 
-  // Procesar filtros de status y rol
-  const statusRaw = filters?.status?.trim();
-  const status = statusRaw ?? UserStatusEnum.PENDING;
-  const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
+  // Estado
+  include.push({
+    model: UserStatus,
+    attributes: ["userStatusName"],
+    ...(applyStatus ? { where: { userStatusName: status }, required: true } : { required: false })
+  });
 
-  const normalizedRole = filters?.role?.trim();
-  const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== "todos";
-
-  const includeOptions = [
-    {
-      model: UserStatus,
-      attributes: ["userStatusName"],
-      ...(isStatusAll ? {} : { where: { userStatusName: status } })
+  // Rol (siempre se excluye TUTOR, incluso si no hay filtro de rol)
+  include.push({
+    model: Role,
+    attributes: ["roleName"],
+    where: {
+      ...(applyRole ? { roleName: role } : {}),
+      roleName: { [Op.not]: RoleEnum.TUTOR } // excluir TUTOR siempre
     },
-    {
-      model: Role,
-      attributes: ["roleName"],
-      ...(isSpecificRole
-        ? { where: { roleName: normalizedRole } }
-        : { where: { roleName: { [Op.not]: RoleEnum.TUTOR } } })
-    }
-  ];
+    required: true
+  });
 
   const users = await User.findAll({
-    where: whereConditions,
+    where,
+    include,
     attributes: ["userId", "userFirstName", "userLastName", "createdDate"],
-    include: includeOptions,
-    order: [["createdDate", "ASC"]],
+    order: [["createdDate", "DESC"]],
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
   });
 
   return users.map(mapUserToDto);
 }
-
-
-
-
-
-
 
 
 
@@ -360,14 +427,46 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
         userPending.setUserStatus(activeStatus?.userStatusId)
         userPending.updatedDate = new Date()
         userPending.save();
-        const html = `
-            <p>Estimado/a ${userPending.userFirstName},</p>
-            <p>Su usuario con permiso ${(await userPendingRole).roleName} ha sido dado de alta satisfactoriamente.</p>
-            <p>Para inicar sesión en la paltaforma, ingrese a traves del siguiente botón: Iniciar sesión":</p>
-                <p>Muchas gracias.</p>
-          `;
 
-        await sendEmail(userPending.userEmail, 'Respuesta de alta de usuario', html);
+
+        // Obtener plantilla de respuesta a usuario pendiente
+          const template = await NotificationTemplate.findOne({
+            where: { notificationTemplateName: "ANSWER_USER_PENDING" }
+          });
+        
+          if (!template) {
+            throw new Error("Plantilla de recuperación de contraseña no encontrada");
+          }
+        
+          // Construir el cuerpo con reemplazos
+         // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
+          const html = template.notificationTemplateDescription
+            .replace("{{userFirstName}}", userPending.userFirstName)
+            .replace("{roleName}}", (await userPendingRole).roleName);
+        
+        
+             await sendEmail(userPending.userEmail, template.notificationTemplateEmailSubject, html);
+        
+          // Crear notificación de email
+          await NotificationEmail.create({
+            notificationEmailUserId: userPending.userId,
+            notificationEmailNotTemplateId: template.notificationTemplateId,
+            //emailTo: user.userEmail,
+            //emailStatus: "PENDING",
+            createdDate: new Date(),
+            //emailSubject: template.emailSubject,
+            //emailHtml: html // campo opcional si querés guardar el cuerpo ya procesado
+          });
+
+
+        // const html = `
+        //     <p>Estimado/a ${userPending.userFirstName},</p>
+        //     <p>Su usuario con permiso ${(await userPendingRole).roleName} ha sido dado de alta satisfactoriamente.</p>
+        //     <p>Para inicar sesión en la paltaforma, ingrese a traves del siguiente botón: Iniciar sesión":</p>
+        //         <p>Muchas gracias.</p>
+        //   `;
+
+        // await sendEmail(userPending.userEmail, 'Respuesta de alta de usuario', html);
     }
     else {
         //No lo acepto en la plataforma

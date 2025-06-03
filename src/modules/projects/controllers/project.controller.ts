@@ -319,5 +319,3 @@ export async function getAllTask(req: Request, res: Response) {
     data: tasks,
   });
 };
-
-
