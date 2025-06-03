@@ -8,7 +8,6 @@ import { updateTaskSchema } from "../schemas/updateTask.schema";
 import {createCommentSchema} from "../schemas/createComment.schema";
 import {updateCommentSchema} from "../schemas/updateComment.schema";
 import {AllCommentFiltersSchema} from "../schemas/allCommentFilter.schema";
-import { upload } from "../../../middlewares/upload.middleware";
 import { deleteAttachment, handleTaskFileUpload , downloadAttachment} from "../controllers/attachment.controller";
 
 
