@@ -12,7 +12,7 @@ import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNo
 import { UserFilter } from "../dtos/userFilters.dto";
 import { Op, where } from 'sequelize';
 import { mapOneUserToDto, OneUserDto } from "../dtos/oneUserResponse.dto";
-import { sendEmail } from '../../notifications/services/notification.service';
+import { renderTemplate, sendEmail } from '../../notifications/services/notification.service';
 import { AllRoleDto, mapRoleToDto } from '../dtos/allRole.dto';
 import { ResponseUserEnum } from "../enums/responseUser.enum";
 import { appConfig } from "../../../config/app";
@@ -440,10 +440,11 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
         
           // Construir el cuerpo con reemplazos
          // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
-          const html = template.notificationTemplateDescription
-            .replace("{{userFirstName}}", userPending.userFirstName)
-            .replace("{roleName}}", (await userPendingRole).roleName);
-        
+         const html = await renderTemplate(template.notificationTemplateDescription, {
+  userFirstName: userPending.userFirstName,
+  roleName: (await userPendingRole).roleName
+});
+
         
              await sendEmail(userPending.userEmail, template.notificationTemplateEmailSubject, html);
         
