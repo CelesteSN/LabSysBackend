@@ -25,7 +25,7 @@ import { parse } from 'date-fns';
 import { UserStatus } from "../models/userStatus.model";
 import { UserStatusEnum } from "../../users/enums/userStatus.enum";
 import { AllUsersDto, mapUserToDto } from "../dtos/userList.dto";
-import { sendEmail } from '../../notifications/services/notification.service';
+import { renderTemplate, sendEmail } from '../../notifications/services/notification.service';
 import { mapOneStageToDto, OneStageDto } from "../dtos/oneStage.dto";
 import { Task } from "../models/task.model";
 import { TaskStatus } from "../models/taskStatus.model";
@@ -505,13 +505,11 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
                
               // Construir el cuerpo con reemplazos
              // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
-              const html = template.notificationTemplateDescription
-                .replace("{{userFirstName}}", user.userFirstName)
-                .replace("{userLastName}}", user.userLastName)
-                .replace("{projectName}}", project.projectName);
-
-            
-            
+             const html = await renderTemplate(template.notificationTemplateDescription, {
+  userFirstName: user.userFirstName,
+  userLastName: user.userLastName,
+  projectName: project.projectName
+});
                  await sendEmail(user.userEmail, template.notificationTemplateEmailSubject, html);
             
               // Crear notificación de email

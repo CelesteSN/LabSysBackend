@@ -18,3 +18,15 @@ export async function sendEmail(to: string, subject: string, htmlContent: string
 
   await transporter.sendMail(mailOptions);
 }
+
+
+
+
+
+export async function renderTemplate(template: string, params: Record<string, any>): Promise<string> {
+  return template.replace(/{{(.*?)}}/g, (_, key) => {
+    const value = key.trim().split('.').reduce((acc: any, part: any) => acc?.[part], params);
+    return value ?? '';
+  });
+}
+
