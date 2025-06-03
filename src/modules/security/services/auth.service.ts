@@ -22,6 +22,8 @@ import { randomUUID } from "crypto";
 const JWT_SECRET = process.env.JWT_SECRET || 'default_secret';
 //const PASSWORD_TOKEN_TTL: process.env.PASSWORD_TOKEN_TTL;
 import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, UserPendingError } from '../../../errors/customUserErrors';
+import { NotificationTemplate } from "../../notifications/models/notificationTemplate.model";
+import { NotificationEmail } from "../../notifications/models/notificationEmail.model";
 
 
 
@@ -118,17 +120,50 @@ if(!(userStatus.userStatusName == UserStatusEnum.ACTIVE)){throw new Error("Usuar
   await newPasswordToken.save();
   
 
-  const recoveryLink = `https://tu-app.com/reset-password/${token}`;
-  const html = `
-    <p>Estimado/a ${user.userFirstName},</p>
-    <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-    <p>Debe ingresar al siguiente enlace para continuar:</p>
-    <p><a href="${recoveryLink}">${recoveryLink}</a></p>
-    <p>Si no fue usted, ignore este mensaje.</p>
-        <p>Muchas gracias.</p>
-  `;
+  // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
+  // const html = `
+  //   <p>Estimado/a ${user.userFirstName},</p>
+  //   <p>Recibimos una solicitud para restablecer tu contraseña.</p>
+  //   <p>Debe ingresar al siguiente enlace para continuar:</p>
+  //   <p><a href="${recoveryLink}">${recoveryLink}</a></p>
+  //   <p>Si no fue usted, ignore este mensaje.</p>
+  //       <p>Muchas gracias.</p>
+  // `;
 
-  await sendEmail(email, 'Recuperación de contraseña', html);
+  // await sendEmail(email, 'Recuperación de contraseña', html);
+
+
+
+
+
+  // Obtener plantilla de recuperación
+  const template = await NotificationTemplate.findOne({
+    where: { notificationTemplateName: "RECOVERY_PASSWORD" }
+  });
+
+  if (!template) {
+    throw new Error("Plantilla de recuperación de contraseña no encontrada");
+  }
+
+  // Construir el cuerpo con reemplazos
+ // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
+  const html = template.notificationTemplateDescription
+    .replace("{{userFirstName}}", user.userFirstName)
+    .replace("{{recoveryLink}}", template.notificationTemplatelinkRedirect);
+
+
+     await sendEmail(email, template.notificationTemplateEmailSubject, html);
+
+  // Crear notificación de email
+  await NotificationEmail.create({
+    notificationEmailUserId: user.userId,
+    notificationEmailNotTemplateId: template.notificationTemplateId,
+    //emailTo: user.userEmail,
+    //emailStatus: "PENDING",
+    createdDate: new Date(),
+    //emailSubject: template.emailSubject,
+    //emailHtml: html // campo opcional si querés guardar el cuerpo ya procesado
+  });
 }
 
 

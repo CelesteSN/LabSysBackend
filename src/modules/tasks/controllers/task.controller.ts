@@ -3,7 +3,7 @@ import { AllTasksDto } from "../dtos/allTask.dto";
 import { CommentFilter } from "../dtos/commentFilter.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment, getOneComment} from "../services/task.service";
+import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment, getOneComment, listTaskStatus} from "../services/task.service";
 import { Request, Response } from "express";
 
 
@@ -48,8 +48,8 @@ export async function updateTask(req: Request, res: Response) {
     const taskEndDate = req.body.taskEndDate;
     const taskDescription = req.body.taskDescription;
     const taskStatusId = req.body.taskStatusId;
-    const priority = req.body.taskPriority;
-
+    const priority = req.body.taskPriority != null ? Number(req.body.taskPriority) : undefined;
+//priority: req.query.priority != null ? Number(req.query.priority) : undefined,
     await modifyTask(userLoguedId, taskId, taskName, taskOrder, taskStartDate, taskEndDate, taskStatusId, taskDescription, priority);
     res.status(200).json({
         success: true,
@@ -157,3 +157,22 @@ export async function getCommentById(req: Request, res: Response) {
         data: comment
     });
 }
+
+
+export const getAllTaskStatus = catchAsync(async (req: Request, res: Response) => {
+  const { userLoguedId } = (req as any).user;
+  const taskStatusList = await listTaskStatus(userLoguedId);
+  if (taskStatusList.length === 0) {
+    return res.status(200).json({
+      success: true,
+      // pageNumber,
+      message: 'No se encontraron tipos de proyecto.',
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    //pageNumber,
+    data: taskStatusList,
+  });
+})

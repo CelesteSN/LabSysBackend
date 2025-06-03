@@ -17,21 +17,26 @@ export type OneTaskDto = {
 };
 
 export function mapOneTaskToDto(task: Task): OneTaskDto {
-    return {
+    const dto: any = {
         taskId: task.taskId,
         stage: task.Stage.stageName,
         owner: `${task.User.userFirstName} ${task.User.userLastName}`,
-        //name: `${user.userFirstName} ${user.userLastName}`,
         taskName: task.taskTitle,
         taskOrder: task.taskOrder,
         taskDescription: task.taskDescription || "",
-        taskPriority: task.taskPriority || null,
         taskStartDate: formatDate(task.taskStartDate),
         taskEndDate: formatDate(task.taskEndDate),
         taskStatus: task.TaskStatus.taskStatusName,
         createdDate: formatDate(task.createdDate)
     };
+
+    if (task.taskPriority != null) {
+        dto.taskPriority = task.taskPriority;
+    }
+
+    return dto;
 }
+
 function formatDate(date: Date | string): string {
   return format(new Date(date), 'dd-MM-yyyy');
 }
