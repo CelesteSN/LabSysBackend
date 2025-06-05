@@ -1,5 +1,6 @@
 import { Comment } from "../models/comment.model";
 import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 
 
 export type OneCommentDto = {
@@ -22,6 +23,11 @@ export function mapOneCommentToDto(comment: Comment): OneCommentDto {
         createdDate: formatDate(comment.createdDate)
     };
 }
-function formatDate(date: Date | string): string {
-  return format(new Date(date), 'dd-MM-yyyy');
+// function formatDate(date: Date | string): string {
+//   return format(new Date(date), 'dd-MM-yyyy');
+// }
+function formatDate(date: Date): string {
+  const timeZone = 'America/Argentina/Buenos_Aires';
+  const zonedDate = toZonedTime(date, timeZone);
+  return format(zonedDate, 'dd-MM-yyyy HH:mm');
 }

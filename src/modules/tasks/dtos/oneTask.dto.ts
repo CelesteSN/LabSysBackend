@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 export type OneTaskDto = {
      taskId: string;
     stage: string;
+    stageId: string
     owner: string;
     taskName: string;
     taskOrder: number;
@@ -20,6 +21,7 @@ export function mapOneTaskToDto(task: Task): OneTaskDto {
     const dto: any = {
         taskId: task.taskId,
         stage: task.Stage.stageName,
+        stageId: task.Stage.stageId,
         owner: `${task.User.userFirstName} ${task.User.userLastName}`,
         taskName: task.taskTitle,
         taskOrder: task.taskOrder,

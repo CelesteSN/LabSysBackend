@@ -319,7 +319,7 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
       },
       {
         model: Stage,
-        attributes: ["stageName"],
+        attributes: ["stageName", "stageId"],
         include: [
           {
             model: StageStatus
@@ -854,7 +854,7 @@ export async function listComment(userLoguedId: string, taskId: string, filters:
     include: [
       {
         model: CommentType,
-        attributes: ["commentTypeName"]
+        attributes: ["commentTypeName", "commentTypeId"]
       },
       {
         model: User,
@@ -934,7 +934,7 @@ export async function addComment(userLoguedId: string, taskId: string, commentDe
     ]
   });
 
-  if (!validatedTask) throw new NotFoundResultsError();
+  if (!validatedTask) throw new ForbiddenAccessError("No se encontro la tarea o ya esta finalizada");
 
   // Validar si es TUTOR o responsable de la tarea
   const isOwner = validatedTask.taskUserId === userLoguedId;
@@ -1190,4 +1190,13 @@ await NotificationEmail.create({
     const taskStatusList = await TaskStatus.findAll()
 
     return taskStatusList
+  }
+
+
+
+
+  export async function listCommentType(userLoguedId: string) {
+    const userValidated = await validateActiveUser(userLoguedId);
+    const commentType = await CommentType.findAll();
+    return commentType
   }
