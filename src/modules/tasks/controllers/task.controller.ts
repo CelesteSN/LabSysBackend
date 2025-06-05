@@ -3,7 +3,7 @@ import { AllTasksDto } from "../dtos/allTask.dto";
 import { CommentFilter } from "../dtos/commentFilter.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment, getOneComment, listTaskStatus} from "../services/task.service";
+import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment, getOneComment, listTaskStatus, listCommentType} from "../services/task.service";
 import { Request, Response } from "express";
 
 
@@ -174,5 +174,26 @@ export const getAllTaskStatus = catchAsync(async (req: Request, res: Response) =
     success: true,
     //pageNumber,
     data: taskStatusList,
+  });
+})
+
+
+
+export const getAllCommentType = catchAsync(async (req: Request, res: Response) => {
+  const { userLoguedId } = (req as any).user;
+  const commentTypeList = await listCommentType(userLoguedId);
+  if (commentTypeList.length === 0) {
+    return res.status(200).json({
+      success: true,
+      // pageNumber,
+     // message: 'No se encontraron tipos de proyecto.',
+     data: []
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    //pageNumber,
+    data: commentTypeList,
   });
 })

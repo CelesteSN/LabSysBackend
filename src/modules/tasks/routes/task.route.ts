@@ -1,5 +1,5 @@
 import { Router } from "express";
-import {  createTask, getTaskById, updateTask, deleteTask, getAllComments, createComment, updateComment, deleteComment, getCommentById, getAllTaskStatus} from "../controllers/task.controller";
+import {  createTask, getTaskById, updateTask, deleteTask, getAllComments, createComment, updateComment, deleteComment, getCommentById, getAllTaskStatus, getAllCommentType} from "../controllers/task.controller";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { createTaskSchema } from '../schemas/createTask.schema';
@@ -9,8 +9,6 @@ import {createCommentSchema} from "../schemas/createComment.schema";
 import {updateCommentSchema} from "../schemas/updateComment.schema";
 import {AllCommentFiltersSchema} from "../schemas/allCommentFilter.schema";
 import { deleteAttachment, handleTaskFileUpload , downloadAttachment} from "../controllers/attachment.controller";
-
-
 import cloudinaryUpload from '../../../config/cloudinary.storage';
 
 
@@ -29,6 +27,7 @@ taskRouter.get('/comments/:commentId', authenticateToken,checkBlacklist, getComm
 taskRouter.get('/:taskId/comments', authenticateToken,checkBlacklist, validateRequest({query: AllCommentFiltersSchema}), getAllComments);
 taskRouter.put("/comments/:commentId", authenticateToken, checkBlacklist, validateRequest({ body: updateCommentSchema }), updateComment);
 taskRouter.delete("/comments/:commentId", authenticateToken, checkBlacklist, deleteComment);
+taskRouter.get("/commentTypes", authenticateToken, checkBlacklist, getAllCommentType)
 
 //Rutas de tareas
 taskRouter.get("/taskStatus",authenticateToken, checkBlacklist, getAllTaskStatus);
