@@ -15,6 +15,12 @@ import { taskRouter } from "./modules/tasks/routes/task.route";
 
 // import path from "path";
 // import { ENV } from "./config/env";
+import cron from 'node-cron';
+import { cronUpdateDelayedTasks } from './cron/updatedDelayedTask.cron';
+
+cron.schedule('0 3 * * *', async () => {
+  await cronUpdateDelayedTasks();
+});
 
 const app = express();
 // Middleware para servir archivos estáticos

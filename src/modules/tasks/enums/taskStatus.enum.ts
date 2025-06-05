@@ -3,5 +3,6 @@ export enum TaskStatusEnum {
     INPROGRESS = "En progreso",
     FINISHED = "Finalizada",
     LOW = "Dado de baja",
+    DELAYED="Demorada",
     ALL = "Todos"
 }
