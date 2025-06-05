@@ -27,7 +27,7 @@ import { mapOneCommentToDto } from "../dtos/oneComment.dto";
 import { updateTask } from "../controllers/task.controller";
 import { NotificationTemplate } from "../../notifications/models/notificationTemplate.model";
 import { NotificationEmail } from "../../notifications/models/notificationEmail.model";
-import { sendEmail } from "../../notifications/services/notification.service";
+import { renderTemplate, sendEmail } from "../../notifications/services/notification.service";
 import { Role } from "../models/role.model";
 
 
@@ -368,18 +368,15 @@ export async function modifyTask(
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
-  if (!(userRole.roleName == RoleEnum.BECARIO || userRole.roleName == RoleEnum.PASANTE)) { throw new ForbiddenAccessError(); }
-
-
+  if (!(userRole.roleName == RoleEnum.BECARIO || userRole.roleName == RoleEnum.PASANTE)) {
+    throw new ForbiddenAccessError();
+  }
 
   const updatedTask = await Task.findOne({
     where: { taskId, taskUserId: userLoguedId },
     include: [
       {
         model: TaskStatus,
-        where: {
-          taskStatusName: { [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }
-        },
         attributes: ["taskStatusName"]
       },
       {
@@ -418,6 +415,12 @@ export async function modifyTask(
 
   if (!updatedTask) throw new NotFoundResultsError();
 
+  // 🚫 Bloquear modificación si la tarea ya está finalizada
+  const currentTaskStatus = await updatedTask.getTaskStatus();
+  if (currentTaskStatus.taskStatusName === TaskStatusEnum.FINISHED) {
+    throw new ForbiddenAccessError("No se puede modificar una tarea finalizada");
+  }
+
   const stageAux = await updatedTask.getStage();
   const proy = await stageAux.getProject();
 
@@ -425,7 +428,6 @@ export async function modifyTask(
     throw new ForbiddenAccessError();
   }
 
-  // Validar nombre duplicado
   const taskNameExists = await Task.findOne({
     where: {
       taskTitle: taskName,
@@ -433,10 +435,8 @@ export async function modifyTask(
       taskId: { [Op.ne]: taskId }
     }
   });
-
   if (taskNameExists) throw new NameUsedError();
 
-  // Validar orden duplicado
   const orderExist = await Task.findOne({
     where: {
       taskOrder,
@@ -444,65 +444,61 @@ export async function modifyTask(
       taskId: { [Op.ne]: taskId }
     }
   });
-
   if (orderExist) throw new OrderExistsError();
 
-  // Validar status
-  const validStatus = await TaskStatus.findOne({
-    where: { taskStatusId: taskStatus }
-  });
-
+  const validStatus = await TaskStatus.findOne({ where: { taskStatusId: taskStatus } });
   if (!validStatus) throw new StatusNotFoundError();
 
-  if (validStatus.taskStatusName == TaskStatusEnum.INPROGRESS || validStatus.taskStatusName == TaskStatusEnum.FINISHED) {
+  const stageStatus = await stageAux.getStageStatus();
+  const projectStatus = await proy.getProjectStatus();
 
-    //Busco el estado para la etapa y para el proyecto
-    const newStatusStage = await StageStatus.findOne({
-      where: {
-        stageStatusName: validStatus.taskStatusName
-      }
-    })
-    if (!newStatusStage) { throw new ForbiddenAccessError("No se encontro el estado") }
-    await stageAux.setStageStatus(newStatusStage.stageStatusId);
-    const newStatusProject = await ProjectStatus.findOne({
-      where: {
-        projectStatusName: validStatus.taskStatusName
-      }
-    })
-
-    if (!newStatusProject) { throw new ForbiddenAccessError("No se encontro el estado") }
-    await proy.setProjectStatus(newStatusProject.projectStatusId);
+  // Si una tarea pasa a EN PROGRESO
+  if (validStatus.taskStatusName === TaskStatusEnum.INPROGRESS) {
+    if (stageStatus.stageStatusName === StageStatusEnum.PENDING) {
+      const inProgressStageStatus = await StageStatus.findOne({ where: { stageStatusName: StageStatusEnum.INPROGRESS } });
+      if (inProgressStageStatus) await stageAux.setStageStatus(inProgressStageStatus);
+    }
+    if (projectStatus.projectStatusName === ProjectStatusEnum.ACTIVE) {
+      const inProgressProjectStatus = await ProjectStatus.findOne({ where: { projectStatusName: ProjectStatusEnum.INPROGRESS } });
+      if (inProgressProjectStatus) await proy.setProjectStatus(inProgressProjectStatus);
+    }
   }
 
-  // Verificar que el usuario logueado es el autor del comentario
-  // const isOwner = updateTask.taskUserId === userLoguedId;
-  // if (!isOwner) throw new ForbiddenAccessError();
+  // Si todas las tareas están finalizadas, cambiar a FINALIZADO
+  const tasksOfStage = await Task.findAll({ where: { taskStageId: stageAux.stageId }, include: [TaskStatus] });
+  const allFinished = tasksOfStage.every(t => t.TaskStatus?.taskStatusName === TaskStatusEnum.FINISHED);
+  if (allFinished) {
+    const finishedStageStatus = await StageStatus.findOne({ where: { stageStatusName: StageStatusEnum.FINISHED } });
+    if (finishedStageStatus) await stageAux.setStageStatus(finishedStageStatus);
 
-  // 🔎 Validar fechas antes de guardar
+    const allStages = await Stage.findAll({ where: { stageProjectId: proy.projectId }, include: [StageStatus] });
+    const allStagesFinished = allStages.every(s => s.StageStatus?.stageStatusName === StageStatusEnum.FINISHED);
+    if (allStagesFinished) {
+      const finishedProjectStatus = await ProjectStatus.findOne({ where: { projectStatusName: ProjectStatusEnum.FINISHED } });
+      if (finishedProjectStatus) await proy.setProjectStatus(finishedProjectStatus);
+    }
+  }
+
   const parsedStart = parse(taskStartDate, 'dd-MM-yyyy', new Date());
   const parsedEnd = parse(taskEndDate, 'dd-MM-yyyy', new Date());
-
   await validateTaskDateWithinProjectLimits(updatedTask.taskStageId, parsedStart, parsedEnd);
 
-  // ✅ Actualizar valores
   updatedTask.taskTitle = taskName;
   updatedTask.taskOrder = taskOrder;
   updatedTask.taskStartDate = parsedStart;
   updatedTask.taskEndDate = parsedEnd;
-  if (priority != null) {
-    updatedTask.taskPriority = Number(priority);
-  }
+  if (priority != null) updatedTask.taskPriority = Number(priority);
   updatedTask.taskDescription = taskDescription || null;
   updatedTask.taskStatusId = validStatus.taskStatusId;
   updatedTask.updatedDate = new Date();
 
-  // Guardar y actualizar etapa
   await updatedTask.save();
   await updateStageProgress(updatedTask.taskStageId);
   await updateStageDates(updatedTask.taskStageId);
 
   return updatedTask;
 }
+
 
 
 // export async function modifyTask(userLoguedId: string, taskId: string, taskName: string, taskOrder: number, taskStartDate: string, taskEndDate: string, taskStatus: string, taskDescription?: string, priority?: number): Promise<Task | null> {
@@ -780,22 +776,36 @@ export async function updateStageProgress(stageId: string): Promise<void> {
     ]
   });
 
-  const totalTasks = tasks.length;
-  if (totalTasks === 0) {
+  if (tasks.length === 0) {
     await Stage.update({ stageProgress: 0 }, { where: { stageId } });
     return;
   }
 
-  // Contar las tareas finalizadas
-  const completedTasks = tasks.filter(task =>
-    task.TaskStatus?.taskStatusName?.toUpperCase() === "FINALIZADA"
-  ).length;
+  // Asignar peso según la prioridad: 0 = 1, 1 = 2, 2 = 3, 3 = 4
+  const getPriorityWeight = (priority?: number | null): number => {
+    if (priority == null) return 1;
+    return priority + 1;
+  };
 
-  const progress = Math.round((completedTasks / totalTasks) * 100);
+  let totalWeight = 0;
+  let completedWeight = 0;
+
+  for (const task of tasks) {
+    const weight = getPriorityWeight(task.taskPriority);
+    totalWeight += weight;
+
+    if (task.TaskStatus?.taskStatusName?.toUpperCase() === "FINALIZADA") {
+      completedWeight += weight;
+    }
+  }
+
+  const progress = Math.round((completedWeight / totalWeight) * 100);
 
   // Actualizar el progreso de la etapa
   await Stage.update({ stageProgress: progress }, { where: { stageId } });
 }
+
+
 
 
 export async function listComment(userLoguedId: string, taskId: string, filters: CommentFilter): Promise<TaskDetailsDto | null> {
@@ -997,11 +1007,13 @@ if (!receiver || !receiver.userEmail) {
 }
 
 
-const html = template.notificationTemplateDescription
-  .replace("{{receiverFirstName}}", receiver.userFirstName)
-  .replace("{{receiverLastName}}", receiver.userLastName)
-  .replace("{{senderFirstName}}", userValidated.userFirstName)
-  .replace("{{senderLastName}}", userValidated.userLastName);
+const html = await renderTemplate(template.notificationTemplateDescription, {
+  receiverFirstName: receiver.userFirstName,
+  receiverLastName: receiver.userLastName,
+  taskName: validatedTask.taskTitle,
+  projectName: validatedTask.Stage.Project.projectName
+});
+
 
 await sendEmail(receiver.userEmail, template.notificationTemplateEmailSubject, html);
 
