@@ -1,7 +1,7 @@
 export enum StageStatusEnum {
     PENDING= "Pendiente",
     INPROGRESS = "En progreso",
-    FINISHED = "Finalizado",
+    FINISHED = "Finalizada",
     LOW = "Dado de baja",
         DELAYED="Atrasada",
 
