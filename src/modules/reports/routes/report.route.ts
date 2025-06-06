@@ -2,21 +2,22 @@ import { Router } from "express";
 import { authenticateToken } from '../../../middlewares/auth.middleware';
 import { validateRequest } from '../../../middlewares/validateRequest';
 import { checkBlacklist } from '../../../middlewares/checkBlacList.middleware';
+import {getFullReport} from "../controllers/report.controller"
 
 export const reportRouter = Router();
 
 //	Porcentaje de avance del proyecto
-reportRouter.get("/progress",authenticateToken,checkBlacklist, );
+reportRouter.get("/project/:projectId",authenticateToken,checkBlacklist, getFullReport);
 
 //Cantidad total de tareas atrasadas
-reportRouter.get("/overdue-tasks",authenticateToken,checkBlacklist);
+//reportRouter.get("/project/:projectId/overdue-tasks",authenticateToken,checkBlacklist, getDelayedTasks);
 
 //Comentarios + archivos por becario
-reportRouter.get("/participation",authenticateToken,checkBlacklist);
+//reportRouter.get("/project/:projectId/participation",authenticateToken,checkBlacklist, getUserParticipationChart);
 
 
 //Cantidad de tareas por estado y becario (agrupadas)
-reportRouter.get("/task-distribution",authenticateToken,checkBlacklist);	
+//reportRouter.get("/project/:projectId/task-distribution",authenticateToken,checkBlacklist, getTaskDistributionChart);	
 
 //Listado con tareas atrasadas por etapa y becario
-reportRouter.get("/overdue-by-stage",authenticateToken,checkBlacklist);	
+//reportRouter.get("/project/:projectId/overdue-by-stage",authenticateToken,checkBlacklist);	
