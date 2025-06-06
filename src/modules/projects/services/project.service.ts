@@ -508,7 +508,8 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
              const html = await renderTemplate(template.notificationTemplateDescription, {
   userFirstName: user.userFirstName,
   userLastName: user.userLastName,
-  projectName: project.projectName
+  projectName: project.projectName,
+  linkRedirect: template.notificationTemplatelinkRedirect
 });
                  await sendEmail(user.userEmail, template.notificationTemplateEmailSubject, html);
             
@@ -516,26 +517,9 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
               await NotificationEmail.create({
                 notificationEmailUserId: userId,
                 notificationEmailNotTemplateId: template.notificationTemplateId,
-                //emailTo: user.userEmail,
-                //emailStatus: "PENDING",
                 createdDate: new Date(),
-                //emailSubject: template.emailSubject,
-                //emailHtml: html // campo opcional si querés guardar el cuerpo ya procesado
               });
     
-    // const html = `
-    //   <p>Estimado/a ${user.userFirstName} ${user.userLastName},</p>
-    //   <p>Le informamos que ha sido asignado al proyecto <strong>${project.projectName}</strong>.</p>
-    //   <p>Para visualizar los detalles del proyecto, ingrese al sistema a través del siguiente botón: “Iniciar sesión”.</p>
-    //   <p>Saludos.</p>
-    // `;
-
-    // try {
-    //   await sendEmail(user.userEmail, 'Asignación a proyecto', html);
-    // } catch (err) {
-    //   console.error(`Error al enviar email a ${user.userEmail}:`, err);
-    //   // Podés registrar el error pero continuar con el resto
-    // }
   }
 
   return;

@@ -377,18 +377,6 @@ export async function getUser(userLoguedId: string, id: string): Promise<OneUser
 
 
 export async function addAnswer(userLoguedId: string, userId: string, response: ResponseUserEnum, comment?: string) {
-    //Obtengo el usuario logueado
-    // const loguedUser = await User.findByPk(userLoguedId);
-    // if (!loguedUser) {
-    //     throw new UserNotFoundError();
-    // }
-
-    // const userLoguedStatus = await loguedUser.getUserStatus();
-
-    // if (!(userLoguedStatus.userStatusName == UserStatusEnum.ACTIVE)) {
-    //     throw new Error("No puede acceder a esta funcionalidad")
-    // }
-
     const userValidated = await validateActiveUser(userLoguedId);
     const roleUser = await userValidated.getRole();
     if (roleUser?.roleName != RoleEnum.TUTOR) {
@@ -431,7 +419,7 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
 
         // Obtener plantilla de respuesta a usuario pendiente
           const template = await NotificationTemplate.findOne({
-            where: { notificationTemplateName: "ANSWER_USER_PENDING" }
+            where: { notificationTemplateName: "ANSWER_ACCEPT_USER_PENDING" }
           });
         
           if (!template) {
@@ -441,8 +429,10 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
           // Construir el cuerpo con reemplazos
          // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
          const html = await renderTemplate(template.notificationTemplateDescription, {
-  userFirstName: userPending.userFirstName,
-  roleName: (await userPendingRole).roleName
+        userFirstName: userPending.userFirstName,
+        userLastName: userPending.userLastName,
+        roleName: (await userPendingRole).roleName,
+        linkRedirect: template.notificationTemplateDescription
 });
 
         
@@ -458,20 +448,11 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
             //emailSubject: template.emailSubject,
             //emailHtml: html // campo opcional si querés guardar el cuerpo ya procesado
           });
-
-
-        // const html = `
-        //     <p>Estimado/a ${userPending.userFirstName},</p>
-        //     <p>Su usuario con permiso ${(await userPendingRole).roleName} ha sido dado de alta satisfactoriamente.</p>
-        //     <p>Para inicar sesión en la paltaforma, ingrese a traves del siguiente botón: Iniciar sesión":</p>
-        //         <p>Muchas gracias.</p>
-        //   `;
-
-        // await sendEmail(userPending.userEmail, 'Respuesta de alta de usuario', html);
     }
     else {
         //No lo acepto en la plataforma
-        // if (isAccept == "false") {
+
+      
         const rejectedStatus = await UserStatus.findOne({
             where: {
                 'userStatusName': UserStatusEnum.REJECTED
@@ -483,15 +464,42 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
         userPending.updatedDate = new Date();
         userPending.userDisabledReason = comment;
         userPending.save();
-        const html = `
-            <p>Estimado/a ${userPending.userFirstName},</p>
-            <p>Su solicitud de alta de usuario con permiso ${(await userPendingRole).roleName} ha sido rechazada.</p>
-            <p>Motivo de rechazo: ${comment}</p>
-                <p>Muchas gracias.</p>
-          `;
 
 
-        await sendEmail(userPending.userEmail, 'Respuesta de alta de usuario', html);
+
+
+        // Obtener plantilla de respuesta a usuario pendiente
+          const template = await NotificationTemplate.findOne({
+            where: { notificationTemplateName: "ANSWER_REJECT_USER_PENDING" }
+          });
+        
+          if (!template) {
+            throw new Error("Plantilla de recuperación de contraseña no encontrada");
+          }
+        
+          // Construir el cuerpo con reemplazos
+         
+        const html = await renderTemplate(template.notificationTemplateDescription, {
+        userFirstName: userPending.userFirstName,
+        userLastName: userPending.userLastName,
+        roleName: (await userPendingRole).roleName,
+        comment: userPending.userDisabledReason,
+});
+
+        
+        await sendEmail(userPending.userEmail, template.notificationTemplateEmailSubject, html);
+        
+        // Crear notificación de email
+        await NotificationEmail.create({
+        notificationEmailUserId: userPending.userId,
+        notificationEmailNotTemplateId: template.notificationTemplateId,
+            //emailTo: user.userEmail,
+            //emailStatus: "PENDING",
+            createdDate: new Date(),
+            //emailSubject: template.emailSubject,
+            //emailHtml: html // campo opcional si querés guardar el cuerpo ya procesado
+          });
+       
     }
 
 }

@@ -5,7 +5,7 @@ export class NotificationTemplate extends Model{
 declare notificationTemplateId: string;
 declare notificationTemplateName: string;
 declare notificationTemplateDescription: string;
-declare notificationTemplatelinkRedirect: string;
+declare notificationTemplatelinkRedirect?: string | null;
 declare notificationTemplateEmailSubject: string;
 declare createdDate: Date;
 declare updatedDate: Date;
@@ -36,7 +36,7 @@ notificationTemplateDescription:{
 notificationTemplatelinkRedirect:{
         type: DataTypes.STRING,
         field: "link_redirect",
-        allowNull: false
+        allowNull: true
     },
 
 
