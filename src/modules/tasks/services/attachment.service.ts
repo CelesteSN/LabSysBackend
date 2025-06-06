@@ -11,7 +11,6 @@ import { RoleEnum } from "../enums/role.enum";
 import { AttachmentFilter } from "../dtos/allAttachmentFilter.dto";
 import { Op } from "sequelize";
 import { appConfig } from "../../../config/app";
-
 import { ForbiddenAccessError } from '../../../errors/customUserErrors'; ;
 import { v2 as cloudinary } from "cloudinary";
 import { TaskStatus } from "../models/taskStatus.model";
@@ -169,43 +168,30 @@ if (!allowedMimeTypes.includes(file.mimetype)) {
 
   return attachment;
 }
+ 
+  
 
 
-
-
-
-
-export async function getAttachmentStream(userLoguedId: string, attachmentId: string) {
+export async function getAttachmentUrl(userLoguedId: string, attachmentId: string) {
   
   const userValidated = await validateActiveUser(userLoguedId);
     const userRole = await userValidated.getRole();
-
- 
-  
   
   const attachment = await Attachment.findByPk(attachmentId);
   if (!attachment) {
-    throw new ForbiddenAccessError('Archivo no encontrado');
+    throw new ForbiddenAccessError("Archivo no encontrado");
   }
 
-
-   // 🔒 Verificar si el usuario es responsable de la tarea (si no es tutor)
   if (userRole.roleName !== RoleEnum.TUTOR) {
     const task = await attachment.getTask();
     if (task.taskUserId !== userLoguedId) {
-      throw new ForbiddenAccessError("No tiene permiso para descargar archivos");
+      throw new ForbiddenAccessError("No tiene permiso para acceder a este archivo");
     }
   }
-  const response = await axios.get(attachment.attachmentFileLink, {
-    responseType: 'stream',
-  });
 
-  return {
-    stream: response.data,
-    fileName: attachment.attachmentFileName,
-    mimeType: attachment.attachmentMimeType,
-  };
+  return attachment.attachmentFileLink;
 }
+
 
 
 export async function lowAttachment(userLoguedId: string, attachmentId: string): Promise<void> {
