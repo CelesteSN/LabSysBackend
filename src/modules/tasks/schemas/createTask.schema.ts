@@ -45,12 +45,15 @@ export const createTaskSchema = Joi.object({
     }),
 
   taskDescription: Joi.string()
-    .min(3)
-    .max(255)
-    .messages({
-      'string.min': 'La descripción debe tener al menos 3 caracteres.',
-      'string.max': 'La descripción debe tener como máximo 255 caracteres.'
-    }),
+  .allow('')
+  .optional()
+  .min(3)
+  .max(255)
+  .messages({
+    'string.min': 'La descripción debe tener al menos 3 caracteres.',
+    'string.max': 'La descripción debe tener como máximo 255 caracteres.'
+  }),
+
 
   taskPriority: Joi.number()
     .valid(0, 1, 2, 3)

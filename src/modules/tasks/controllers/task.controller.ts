@@ -3,7 +3,7 @@ import { AllTasksDto } from "../dtos/allTask.dto";
 import { CommentFilter } from "../dtos/commentFilter.dto";
 import { TaskFilter } from "../dtos/taskFilters.dto";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
-import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment, getOneComment, listTaskStatus, listCommentType} from "../services/task.service";
+import {  addTask, getOneTask, modifyTask, lowTask, listComment, addComment, modifyComment, lowComment, getOneComment, listTaskStatus, listCommentType, validateTaskDates} from "../services/task.service";
 import { Request, Response } from "express";
 
 
@@ -17,10 +17,13 @@ export async function createTask(req: Request, res: Response) {
     const taskName = req.body.taskName;
     const taskDescription = req.body.taskDescription;
     const taskStartDate = req.body.taskStartDate;
-    const taskEndoDate = req.body.taskEndDate;
+    const taskEndDate = req.body.taskEndDate;
     const priority = req.body.taskPriority;
 
-    const newTask = await addTask(userLoguedId, stageId, taskName, taskOrder, taskStartDate, taskEndoDate, taskDescription, priority);
+     // Validación de coherencia de fechas
+  validateTaskDates(taskStartDate, taskEndDate);
+
+    const newTask = await addTask(userLoguedId, stageId, taskName, taskOrder, taskStartDate, taskEndDate, taskDescription, priority);
 
     res.status(201).json({
         success: true,
@@ -49,7 +52,9 @@ export async function updateTask(req: Request, res: Response) {
     const taskDescription = req.body.taskDescription;
     const taskStatusId = req.body.taskStatusId;
     const priority = req.body.taskPriority != null ? Number(req.body.taskPriority) : undefined;
-//priority: req.query.priority != null ? Number(req.query.priority) : undefined,
+
+// Validación de coherencia de fechas
+  validateTaskDates(taskStartDate, taskEndDate);
     await modifyTask(userLoguedId, taskId, taskName, taskOrder, taskStartDate, taskEndDate, taskStatusId, taskDescription, priority);
     res.status(200).json({
         success: true,

@@ -17,6 +17,7 @@ import { taskRouter } from "./modules/tasks/routes/task.route";
 // import { ENV } from "./config/env";
 import cron from 'node-cron';
 import { cronUpdateDelayedTasks } from './cron/updatedDelayedTask.cron';
+import { reportRouter } from "./modules/reports/routes/report.route";
 
 cron.schedule('0 3 * * *', async () => {
   await cronUpdateDelayedTasks();
@@ -37,6 +38,7 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/tasks", taskRouter);
+app.use("/api/v1/reports", reportRouter);
 
 
 app.use(errorHandler);

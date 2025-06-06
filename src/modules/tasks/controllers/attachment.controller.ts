@@ -1,6 +1,6 @@
 
 import { Request, Response } from "express";
-import { uploadTaskAttachment, listAttachmentsByProject, getAttachmentStream, lowAttachment } from "../services/attachment.service";
+import { uploadTaskAttachment, listAttachmentsByProject, getAttachmentUrl, lowAttachment } from "../services/attachment.service";
 import { AuthRequest } from "../../../middlewares/auth.middleware"; // Ajustá la ruta si es distinta
 import { AttachmentFilter } from "../dtos/allAttachmentFilter.dto";
 import { catchAsync } from "../../../utils/catchAsync";
@@ -36,23 +36,20 @@ export const handleTaskFileUpload = async (req: AuthRequest, res: Response) => {
 
 
 
-
 export const downloadAttachment = async (req: AuthRequest, res: Response) => {
-   const { userLoguedId } = req.user!;
+  const { userLoguedId, roleName } = req.user!;
   const { attachmentId } = req.params;
 
   try {
-    const { stream, fileName, mimeType } = await getAttachmentStream(userLoguedId, attachmentId);
+    const url = await getAttachmentUrl(userLoguedId, attachmentId);
 
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('Content-Type', mimeType);
-
-    stream.pipe(res);
+    res.status(200).json({ success: true, url });
   } catch (error: any) {
-    console.error('Error al descargar archivo:', error);
-    res.status(404).json({ error: error.message || 'Error al descargar el archivo' });
+    console.error("Error al obtener la URL de descarga:", error);
+    res.status(403).json({ error: error.message || "Acceso denegado" });
   }
 };
+
 
 export async function getAllAttachment(req: Request, res: Response) {
   const { userLoguedId } = (req as any).user;
