@@ -11,13 +11,16 @@ import { RoleEnum } from "../enums/role.enum";
 import { AttachmentFilter } from "../dtos/allAttachmentFilter.dto";
 import { Op } from "sequelize";
 import { appConfig } from "../../../config/app";
-import { ForbiddenAccessError } from '../../../errors/customUserErrors'; ;
+import { ForbiddenAccessError , NotFoundResultsError} from '../../../errors/customUserErrors'; ;
 import { v2 as cloudinary } from "cloudinary";
 import { TaskStatus } from "../models/taskStatus.model";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
 import { StageStatus } from "../models/stageStatus.model";
 import { StageStatusEnum } from "../../projects/enums/stageStatus.enum";
 import { ProjectStatusEnum } from "../../projects/enums/projectStatus.enum";
+import ProjectUser from "../models/projectUser.model";
+import { Role } from "../models/role.model";
+import path from 'path';
 
 
 
@@ -90,74 +93,73 @@ export async function listAttachmentsByProject(
 
 
 
-export async function uploadTaskAttachment(taskId: string, userLoguedId: string, file: Express.Multer.File, description?: string) {
+
+
+export async function uploadTaskAttachment(
+  taskId: string,
+  userLoguedId: string,
+  file: Express.Multer.File,
+  description?: string
+) {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
-
-  
-  //Valido si el archivo existe
   if (!file) {
     throw new ForbiddenAccessError("No se subió ningún archivo");
   }
 
-
-//Valido la extensión del archivo
   const allowedMimeTypes = [
-  'image/jpeg', 
-  'image/png',
-  'application/pdf',
-  'text/plain',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-  'application/msword' // .doc
-];
+    'image/jpeg',
+    'image/png',
+    'application/pdf',
+    'text/plain',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword'
+  ];
 
-if (!allowedMimeTypes.includes(file.mimetype)) {
-  throw new ForbiddenAccessError("Tipo de archivo no permitido. Solo se permiten: jpg, png, pdf, txt, docx, doc");
-}
-
-  //Valido la tarea sobre la que quiero adjuntar el archivo
-  const task = await Task.findOne({
-    where:{
-      taskId: taskId
-    },
-    include:[
-      {model: TaskStatus,
-        where: {
-          taskStatusName : TaskStatusEnum.INPROGRESS
-        }
-      },
-      {model: Stage,
-        include: [{model: StageStatus,
-          where: {stageStatusName: StageStatusEnum.INPROGRESS}
-        },
-      {model: Project,
-      include:[
-        {model: ProjectStatus,
-          where: {
-            projectStatusName : ProjectStatusEnum.INPROGRESS
-          }
-        }
-      ]
-      }]
-      },      
-    ]
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    throw new ForbiddenAccessError("Tipo de archivo no permitido. Solo se permiten: jpg, png, pdf, txt, docx, doc");
   }
-  );
+
+  const task = await Task.findOne({
+    where: { taskId },
+    include: [
+      {
+        model: TaskStatus,
+        where: { taskStatusName: TaskStatusEnum.INPROGRESS }
+      },
+      {
+        model: Stage,
+        include: [
+          {
+            model: StageStatus,
+            where: { stageStatusName: StageStatusEnum.INPROGRESS }
+          },
+          {
+            model: Project,
+            include: [
+              {
+                model: ProjectStatus,
+                where: { projectStatusName: ProjectStatusEnum.INPROGRESS }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
   if (!task) {
     throw new ForbiddenAccessError("Tarea no encontrada o no está en estado en progreso");
   }
 
-// 🔒 Verificar si el usuario es responsable de la tarea (si no es tutor)
-  if (userRole.roleName !== RoleEnum.TUTOR) {
-    if (task.taskUserId !== userLoguedId) {
-      throw new ForbiddenAccessError("No tiene permiso para adjuntar archivos a esta tarea");
-    }
+  if (userRole.roleName !== RoleEnum.TUTOR && task.taskUserId !== userLoguedId) {
+    throw new ForbiddenAccessError("No tiene permiso para adjuntar archivos a esta tarea");
   }
 
   const attachment = await Attachment.create({
     attachmentFileName: file.originalname,
-    attachmentFileLink: file.path,
+    attachmentFileLink: file.path, // ✅ esta es la URL final generada por multer-storage-cloudinary
     attachmentDescription: description || null,
     attachmentMimeType: file.mimetype,
     createdDate: new Date(),
@@ -168,8 +170,50 @@ if (!allowedMimeTypes.includes(file.mimetype)) {
 
   return attachment;
 }
+
+
  
   
+
+
+
+
+// export async function buildAttachmentDownloadUrl(attachmentId: string, userLoguedId: string): Promise<string> {
+//   const attachment = await Attachment.findByPk(attachmentId, {
+//     include: [
+//       {
+//         model: User,
+//         attributes: ['userId'],
+//         include: [{ model: Role, attributes: ['roleName'] }]
+//       }
+//     ]
+//   });
+
+//   if (!attachment) throw new NotFoundResultsError();
+
+//   const ownerId = attachment.User?.userId;
+//   if (!ownerId) throw new ForbiddenAccessError("Archivo sin propietario válido");
+
+//   if (ownerId !== userLoguedId) {
+//     const user = await User.findByPk(userLoguedId, {
+//       include: [{ model: Role }]
+//     });
+//     const userRole = user?.Role?.roleName;
+
+//     if (userRole !== RoleEnum.TUTOR) {
+//       throw new ForbiddenAccessError("No tiene permiso para acceder a este archivo.");
+//     }
+//   }
+
+//   // Construcción de la URL de descarga Cloudinary con nombre
+//   const cloudinaryBaseUrl = 'https://res.cloudinary.com/dhjazdw9x/raw/upload';
+//   const fileName = encodeURIComponent(attachment.attachmentFileName); // incluye extensión
+//   const fileId = path.basename(attachment.attachmentFileLink); // ejemplo: tgfoenqacmgyghfnlsoh
+
+//   return `${cloudinaryBaseUrl}/fl_attachment:${fileName}/labsys_uploads/${fileId}`;
+// }
+
+
 
 
 export async function getAttachmentUrl(userLoguedId: string, attachmentId: string) {

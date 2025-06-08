@@ -18,7 +18,7 @@ export const stageSchema = Joi.object({
     .min(1)
     .required()
     .messages({
-      'number.base': 'El orden debe ser un número.',
+      'number.base': 'El orden debe ser un número positivo mayor a 0.',
       'number.integer': 'El orden debe ser un número entero.',
       'number.min': 'El orden debe ser mayor a 0.',
       'any.required': 'El campo orden es obligatorio.'

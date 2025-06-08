@@ -14,6 +14,7 @@ export type OneTaskDto = {
     taskStartDate: string;
     taskEndDate: string;
     taskStatus: string;
+    taskStatusId: string;
     createdDate: string
 };
 
@@ -29,6 +30,7 @@ export function mapOneTaskToDto(task: Task): OneTaskDto {
         taskStartDate: formatDate(task.taskStartDate),
         taskEndDate: formatDate(task.taskEndDate),
         taskStatus: task.TaskStatus.taskStatusName,
+        taskStatusId:task.TaskStatus.taskStatusId,
         createdDate: formatDate(task.createdDate)
     };
 

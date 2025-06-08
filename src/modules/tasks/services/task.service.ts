@@ -7,7 +7,7 @@ import Stage from "../models/stage.model";
 import { UserStatusEnum } from "../enums/userStatus.enum";
 import ProjectUser from "../models/projectUser.model";
 import { EmailAlreadyExistsError, RoleNotFoundError, StatusNotFoundError, UserNotFoundError, ForbiddenError, ForbiddenAccessError, UserAlreadyDeletedError, NotFoundResultsError, NameUsedError, OrderExistsError, NotModifiOrDeleteCommentError, BadRequestStartDateStageError, BadRequestEndDateStageError, BadRequestError } from '../../../errors/customUserErrors';
-import { parse, addDays, isBefore } from 'date-fns';
+import { parse, addDays, isBefore, startOfDay  } from 'date-fns';
 import { RoleEnum } from "../enums/role.enum";
 import { Op } from "sequelize";
 import { TaskStatusEnum } from "../enums/taskStatus.enum";
@@ -308,7 +308,7 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
     include: [
       {
         model: TaskStatus,
-        attributes: ["taskStatusName"]
+        attributes: ["taskStatusName", "taskStatusId"]
       },
       {
         model: User,
@@ -620,58 +620,56 @@ export async function lowTask(userLoguedId: string, taskId: string) {
   // 🔁 Recalcular etapa
   await updateStageProgress(deletedTask.taskStageId);
   await updateOnlyStageDates(deletedTask.taskStageId);
+  await verifyStageAndProjectCompletion(taskStage.stageId)
 
   return;
 }
 
-// export async function lowTask(userLoguedId: string, taskId: string) {
+//Funcion para verificar si lo que queda despues de eliminar una tarea o etapa esta finalizado, coloca el proyecto en estado finalizado
+export async function verifyStageAndProjectCompletion(stageId: string): Promise<void> {
+  const stage = await Stage.findByPk(stageId, {
+    include: [{ model: Project }]
+  });
+  if (!stage) return;
 
-//     const userValidated = await validateActiveUser(userLoguedId);
-//     const userRole = await userValidated.getRole();
+  const tasks = await Task.findAll({
+    where: { taskStageId: stage.stageId },
+    include: [{ model: TaskStatus, required: true }]
+  });
 
-//     if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
-//         throw new ForbiddenAccessError()
-//     }
+  const allTasksFinished = tasks.length > 0 && tasks.every(
+    t => t.TaskStatus.taskStatusName === TaskStatusEnum.FINISHED
+  );
 
-//     const deletedTask = await Task.findOne({
-//         where: {
-//             taskId: taskId,
-//             taskUserId: userLoguedId
-//         },
-//         include: [
-//             {
-//                 model: TaskStatus,
-//                 where: {
-//                     taskStatusName: {
-//                         [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING]
-//                     }
-//                 },
-//             },
-//         ]
+  if (allTasksFinished) {
+    const finishedStageStatus = await StageStatus.findOne({
+      where: { stageStatusName: StageStatusEnum.FINISHED }
+    });
+    if (finishedStageStatus) {
+      await stage.setStageStatus(finishedStageStatus);
+    }
+  }
 
-//     });
-//     if (!deletedTask) {
-//         throw new NotFoundResultsError();
-//     }
+  const project = await stage.getProject();
+  const allStages = await Stage.findAll({
+    where: { stageProjectId: project.projectId },
+    include: [{ model: StageStatus, required: true }]
+  });
 
-//     //Obtener el id de proyecto a partir de la etapa
+  const allStagesFinished = allStages.length > 0 && allStages.every(
+    s => s.StageStatus.stageStatusName === StageStatusEnum.FINISHED
+  );
 
-//     const taskStage = await deletedTask.getStage();
-//     const stageProject = await taskStage.getProject();
+  if (allStagesFinished) {
+    const finishedProjectStatus = await ProjectStatus.findOne({
+      where: { projectStatusName: ProjectStatusEnum.FINISHED }
+    });
+    if (finishedProjectStatus) {
+      await project.setProjectStatus(finishedProjectStatus);
+    }
+  }
+}
 
-//     //Validar que este asignado al proyecto
-//     await validateProjectMembership(userLoguedId, stageProject.projectId);
-//  //Elimino todas las tareas asociadas
-//     await Comment.destroy({
-//     where:{
-//     commentTaskId : deletedTask.taskId
-// }
-//   })
-//     deletedTask.destroy();
-//     await updateStageProgress(deletedTask.taskStageId);
-//     await updateStageDates(deletedTask.taskStageId);
-//     return
-// }
 
 //Función para validar si existe el usuario y si esta en estado activo
 
@@ -1164,10 +1162,21 @@ await NotificationEmail.create({
 
 
 export function validateTaskDates(startDateStr: string, endDateStr: string): void {
-  const startDate = parse(startDateStr, 'dd-MM-yyyy', new Date());
-  const endDate = parse(endDateStr, 'dd-MM-yyyy', new Date());
+  const today = startOfDay(new Date());
+  const startDate = startOfDay(parse(startDateStr, 'dd-MM-yyyy', new Date()));
+  const endDate = startOfDay(parse(endDateStr, 'dd-MM-yyyy', new Date()));
 
+  // Verificar que la fecha de finalización no sea anterior a la de inicio
   if (isBefore(endDate, startDate)) {
-    throw new ForbiddenAccessError('La fecha de finalización debe ser posterior a la fecha de inicio.');
+    throw new ForbiddenAccessError('La fecha de finalización debe ser igual o posterior a la fecha de inicio.');
+  }
+
+  // Verificar que ninguna de las fechas sea anterior a hoy
+  if (isBefore(startDate, today)) {
+    throw new ForbiddenAccessError('La fecha de inicio no puede ser anterior a la fecha actual.');
+  }
+
+  if (isBefore(endDate, today)) {
+    throw new ForbiddenAccessError('La fecha de finalización no puede ser anterior a la fecha actual.');
   }
 }
