@@ -36,6 +36,7 @@ import { StageFilter } from "../dtos/stageFilters.dto";
 import { Comment } from "../models/comment.model"
 import { NotificationTemplate } from "../../notifications/models/notificationTemplate.model";
 import { NotificationEmail } from "../../notifications/models/notificationEmail.model";
+import { verifyStageAndProjectCompletion } from "../../tasks/services/task.service";
 
 
 
@@ -938,6 +939,7 @@ export async function lowStage(userLoguedId: string, stageId: string) {
 
   // 🗑 Eliminar la etapa
   await deletedStage.destroy();
+  await verifyStageAndProjectCompletion(stageId)
 
   return;
 }

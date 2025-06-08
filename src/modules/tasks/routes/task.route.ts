@@ -9,7 +9,9 @@ import {createCommentSchema} from "../schemas/createComment.schema";
 import {updateCommentSchema} from "../schemas/updateComment.schema";
 import {AllCommentFiltersSchema} from "../schemas/allCommentFilter.schema";
 import { deleteAttachment, handleTaskFileUpload , downloadAttachment} from "../controllers/attachment.controller";
-import cloudinaryUpload from '../../../config/cloudinary.storage';
+//import cloudinaryUpload from '../../../config/cloudinary.storage';
+import  cloudinaryUpload  from '../../../config/cloudinary.storage';
+
 
 
 export const taskRouter = Router();

@@ -59,7 +59,7 @@ export const loginUser = async (loginData: LoginDto) => {
         role: user.userRoleId
       },
       appConfig.JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '3h' }
     );
 
     return {

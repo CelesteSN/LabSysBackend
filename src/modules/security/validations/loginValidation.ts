@@ -3,13 +3,15 @@ import Joi from 'joi';
 export const loginValidation = Joi.object({
    
     email: Joi.string()
-        .trim()
-        .email()
-        .required()
-        .messages({
-            "string.empty": "El campo email es requerido.",
-            "string.email": "Debe ser un correo electrónico válido.",
-        }),
+  .trim()
+  .lowercase() // 👈 convierte el email a minúsculas automáticamente
+  .email()
+  .required()
+  .messages({
+    "string.empty": "El campo email es requerido.",
+    "string.email": "Debe ser un correo electrónico válido.",
+  }),
+
 
     // password: Joi.string()
     //     .trim()
