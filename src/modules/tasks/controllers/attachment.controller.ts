@@ -12,6 +12,7 @@ export const handleTaskFileUpload = async (req: AuthRequest, res: Response) => {
   const { description } = req.body;
   const { userLoguedId } = req.user!;
   const file = req.file;
+    console.log('Uploaded file info:', req.file);
 
 
 // {
@@ -27,6 +28,7 @@ export const handleTaskFileUpload = async (req: AuthRequest, res: Response) => {
   }
 
     const attachment = await uploadTaskAttachment(taskId, userLoguedId, file, description);
+
     return res.status(201).json({
       message: "El archivo  fue subido exitosamente",
       //attachment
@@ -49,6 +51,25 @@ export const downloadAttachment = async (req: AuthRequest, res: Response) => {
     res.status(403).json({ error: error.message || "Acceso denegado" });
   }
 };
+
+
+
+
+// export const getAttachmentDownloadUrl = catchAsync(async (req: AuthRequest, res: Response) => {
+//   const attachmentId = req.params.attachmentId;
+//   const userLoguedId = req.user?.userLoguedId;
+
+//   if (!attachmentId || !userLoguedId) {
+//     return res.status(400).json({ message: "Faltan datos necesarios." });
+//   }
+
+//   const downloadUrl = await getAttachmentUrl(attachmentId, userLoguedId);
+
+//   return res.status(200).json({
+//     message: "El archivo se esta descargando.",
+//     downloadUrl
+//   });
+// });
 
 
 export async function getAllAttachment(req: Request, res: Response) {
@@ -89,6 +110,6 @@ export const deleteAttachment = catchAsync(async (req: Request, res: Response) =
   await lowAttachment(userLoguedId, attachmentId);
   res.status(200).json({
     success: true,
-    message: "El comentario ha sido eliminado exitosamente"
+    message: "El archivo ha sido eliminado exitosamente"
   })
 })
