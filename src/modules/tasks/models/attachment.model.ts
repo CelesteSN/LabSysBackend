@@ -15,7 +15,7 @@ export class Attachment extends Model {
   declare attachmentMimeType: string;
   declare createdDate: Date;
   declare updatedDate: Date;
-  declare deletedDate?: Date;
+  declare attachmentCloudinaryId: string;
   declare attachmentTaskId: string;
   declare attachmentUserId: string;
 
@@ -77,12 +77,11 @@ Attachment.init(
         field: 'updated_date'
 
     },
-    deletedDate: {
-      type: DataTypes.DATE,
-      allowNull: true,
-        field: 'deleted_date'
-
-    },
+    attachmentCloudinaryId: {
+  field: "attachment_cloudinary_id",
+  type: DataTypes.STRING,
+  allowNull: false
+},
     attachmentTaskId: {
      field: "attachment_task_id",
       type: DataTypes.UUID,

@@ -8,7 +8,72 @@ import { RoleEnum } from "../../../tasks/enums/role.enum";
  import { Role } from "../../../tasks/models/role.model"; // Asegurate de importarlo
 
 
-export async function getTaskDistributionByUser(projectId: string) {
+// export async function getTaskDistributionByUser(projectId: string) {
+//   // 1. Buscar miembros del proyecto
+//   const userLinks = await ProjectUser.findAll({
+//     where: { projectUserProjectId: projectId },
+//   });
+
+//   const userIds = userLinks.map(l => l.projectUserUserId);
+
+//   // 2. Filtrar becarios/pasantes
+
+// const users = await User.findAll({
+//   where: {
+//     userId: { [Op.in]: userIds }
+//   },
+//   attributes: ["userId", "userFirstName", "userLastName"],
+//   include: [
+//     {
+//       model: Role,
+//       required: true,
+//       where: {
+//         roleName: { [Op.in]: [RoleEnum.BECARIO, RoleEnum.PASANTE] }
+//       },
+//       attributes: []
+//     }
+//   ]
+// });
+
+
+//   // 3. Obtener tareas por usuario y agrupar por estado
+//   const result = await Promise.all(users.map(async user => {
+//     const tasks = await Task.findAll({
+//       where: { taskUserId: user.userId },
+//       include: [
+//         {
+//           model: Stage,
+//           required: true,
+//           where: { stageProjectId: projectId }
+//         },
+//         {
+//           model: TaskStatus,
+//           attributes: ["taskStatusName"]
+//         }
+//       ]
+//     });
+
+//     const tasksByStatus: Record<string, number> = {};
+//     for (const task of tasks) {
+//       const status = task.TaskStatus?.taskStatusName ?? "SIN_ESTADO";
+//       tasksByStatus[status] = (tasksByStatus[status] || 0) + 1;
+//     }
+
+//     return {
+//       name: `${user.userFirstName} ${user.userLastName}`,
+//       tasksByStatus
+//     };
+//   }));
+
+//   return result;
+// }
+
+
+export async function getTaskDistributionByUser(
+  projectId: string,
+  fechaInicio?: Date,
+  fechaFin?: Date
+) {
   // 1. Buscar miembros del proyecto
   const userLinks = await ProjectUser.findAll({
     where: { projectUserProjectId: projectId },
@@ -17,29 +82,48 @@ export async function getTaskDistributionByUser(projectId: string) {
   const userIds = userLinks.map(l => l.projectUserUserId);
 
   // 2. Filtrar becarios/pasantes
-
-const users = await User.findAll({
-  where: {
-    userId: { [Op.in]: userIds }
-  },
-  attributes: ["userId", "userFirstName", "userLastName"],
-  include: [
-    {
-      model: Role,
-      required: true,
-      where: {
-        roleName: { [Op.in]: [RoleEnum.BECARIO, RoleEnum.PASANTE] }
-      },
-      attributes: []
-    }
-  ]
-});
-
+  const users = await User.findAll({
+    where: {
+      userId: { [Op.in]: userIds }
+    },
+    attributes: ["userId", "userFirstName", "userLastName"],
+    include: [
+      {
+        model: Role,
+        required: true,
+        where: {
+          roleName: { [Op.in]: [RoleEnum.BECARIO, RoleEnum.PASANTE] }
+        },
+        attributes: []
+      }
+    ]
+  });
 
   // 3. Obtener tareas por usuario y agrupar por estado
   const result = await Promise.all(users.map(async user => {
+    // Armamos el filtro condicional
+    const dateFilter = (fechaInicio && fechaFin)
+      ? {
+          [Op.or]: [
+            {
+              taskStartDate: {
+                [Op.between]: [fechaInicio, fechaFin]
+              }
+            },
+            {
+              taskEndDate: {
+                [Op.between]: [fechaInicio, fechaFin]
+              }
+            }
+          ]
+        }
+      : {}; // sin filtro si no hay fechas
+
     const tasks = await Task.findAll({
-      where: { taskUserId: user.userId },
+      where: {
+        taskUserId: user.userId,
+        ...dateFilter
+      },
       include: [
         {
           model: Stage,

@@ -419,7 +419,7 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
 
         // Obtener plantilla de respuesta a usuario pendiente
           const template = await NotificationTemplate.findOne({
-            where: { notificationTemplateName: "ANSWER_ACCEPT_USER_PENDING" }
+            where: { notificationTemplateName: "ANSWER_ACCEPT_USER_PENDING"}
           });
         
           if (!template) {
@@ -432,7 +432,7 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
         userFirstName: userPending.userFirstName,
         userLastName: userPending.userLastName,
         roleName: (await userPendingRole).roleName,
-        linkRedirect: template.notificationTemplateDescription
+        linkRedirect: template.notificationTemplatelinkRedirect
 });
 
         
