@@ -159,7 +159,8 @@ export async function uploadTaskAttachment(
 
   const attachment = await Attachment.create({
     attachmentFileName: file.originalname,
-    attachmentFileLink: file.path, // ✅ esta es la URL final generada por multer-storage-cloudinary
+    attachmentFileLink: file.path, // URL pública del archivo
+    attachmentCloudinaryId: file.filename, // ✅ Agregado: ID de Cloudinary
     attachmentDescription: description || null,
     attachmentMimeType: file.mimetype,
     createdDate: new Date(),
@@ -170,6 +171,7 @@ export async function uploadTaskAttachment(
 
   return attachment;
 }
+
 
 
  
@@ -267,7 +269,9 @@ export async function lowAttachment(userLoguedId: string, attachmentId: string):
   // 3. Eliminar de Cloudinary si tiene ID registrado
   if (attachment.attachmentId) {
     try {
-      await cloudinary.uploader.destroy(attachment.attachmentId);
+     await cloudinary.uploader.destroy(attachment.attachmentCloudinaryId, {
+  resource_type: "raw" // o "image" si es imagen
+});
     } catch (error) {
       console.error("Error al eliminar archivo en Cloudinary:", error);
       // Podés lanzar error si querés que falle todo, o seguir.

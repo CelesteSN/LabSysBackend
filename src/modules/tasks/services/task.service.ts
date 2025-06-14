@@ -29,7 +29,8 @@ import { NotificationTemplate } from "../../notifications/models/notificationTem
 import { NotificationEmail } from "../../notifications/models/notificationEmail.model";
 import { renderTemplate, sendEmail } from "../../notifications/services/notification.service";
 import { Role } from "../models/role.model";
-;
+import { Attachment } from "../models/attachment.model";
+import { v2 as cloudinary } from "cloudinary"; // Usualmente se importa así
 
 
 
@@ -568,6 +569,8 @@ export async function checkAndUpdateStageAndProjectStatusFromTask(taskId: string
 
 
 
+
+
 export async function lowTask(userLoguedId: string, taskId: string) {
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
@@ -597,33 +600,55 @@ export async function lowTask(userLoguedId: string, taskId: string) {
     throw new NotFoundResultsError();
   }
 
-  // 🔍 Obtener la etapa y proyecto
   const taskStage = await deletedTask.getStage();
   if (!taskStage) throw new Error("La tarea no tiene etapa asociada.");
 
   const stageProject = await taskStage.getProject();
   if (!stageProject) throw new Error("La etapa no tiene proyecto asociado.");
 
-  // 🔒 Validar que el usuario está asignado al proyecto
   await validateProjectMembership(userLoguedId, stageProject.projectId);
 
-  // 🗑 Eliminar todos los comentarios asociados a la tarea
+  // 🗑 Eliminar comentarios asociados
   await Comment.destroy({
     where: {
       commentTaskId: deletedTask.taskId
     }
   });
 
+  // 🗑 Eliminar archivos de Cloudinary y luego los registros
+  const attachments = await Attachment.findAll({
+    where: {
+      attachmentTaskId: deletedTask.taskId
+    }
+  });
+
+  for (const attachment of attachments) {
+    if (attachment.attachmentCloudinaryId) {
+      try {
+        await cloudinary.uploader.destroy(attachment.attachmentCloudinaryId, { resource_type: "raw" }); // o "image" si son imágenes
+      } catch (error) {
+        console.error(`Error al eliminar archivo Cloudinary: ${attachment.attachmentCloudinaryId}`, error);
+      }
+    }
+  }
+
+  await Attachment.destroy({
+    where: {
+      attachmentTaskId: deletedTask.taskId
+    }
+  });
+
   // 🗑 Eliminar la tarea
   await deletedTask.destroy();
 
-  // 🔁 Recalcular etapa
+  // 🔁 Recalcular etapa y proyecto
   await updateStageProgress(deletedTask.taskStageId);
   await updateOnlyStageDates(deletedTask.taskStageId);
   await verifyStageAndProjectCompletion(taskStage.stageId)
 
   return;
 }
+
 
 //Funcion para verificar si lo que queda despues de eliminar una tarea o etapa esta finalizado, coloca el proyecto en estado finalizado
 export async function verifyStageAndProjectCompletion(stageId: string): Promise<void> {

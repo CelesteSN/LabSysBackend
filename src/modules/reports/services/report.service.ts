@@ -46,8 +46,8 @@ export async function getFullProjectReport(
   const progress = await getCompletedAndTotalTasks(projectId, fromDate, toDate);
   const delayedTasksCount = await getDelayedTaskCount(projectId, fromDate, toDate);
   const participation = await getUserParticipation(projectId, fromDate, toDate);
-  const taskDistribution = await getTaskDistributionByUser(projectId);
-  const delayedByStage = await getDelayedTasksByStageAndUser(projectId);
+  const taskDistribution = await getTaskDistributionByUser(projectId, fromDate, toDate);
+  const delayedByStage = await getDelayedTasksByStageAndUser(projectId, fromDate, toDate);
 
   // 4. Construcción del DTO
   const report = {
