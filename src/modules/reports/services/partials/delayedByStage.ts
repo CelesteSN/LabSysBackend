@@ -7,7 +7,74 @@ import { RoleEnum } from "../../../tasks/enums/role.enum";
 import { TaskStatusEnum } from "../../../projects/enums/taskStatus.enum";
 import { Role } from "../../../users/models/role.model";
 
-export async function getDelayedTasksByStageAndUser(projectId: string) {
+// export async function getDelayedTasksByStageAndUser(projectId: string) {
+//   // 1. Obtener ID del estado "ATRASADA"
+//   const delayedStatus = await TaskStatus.findOne({
+//     where: { taskStatusName: TaskStatusEnum.DELAYED }
+//   });
+
+//   if (!delayedStatus) {
+//     throw new Error("No se encontró el estado ATRASADA");
+//   }
+
+//   // 2. Buscar tareas en estado ATRASADA, con Stage y User asociados
+//   const tasks = await Task.findAll({
+//   where: {
+//     taskStatusId: delayedStatus.taskStatusId
+//   },
+//   include: [
+//     {
+//       model: Stage,
+//       required: true,
+//       where: { stageProjectId: projectId },
+//       attributes: ["stageName"]
+//     },
+//     {
+//       model: User,
+//       required: true,
+//       attributes: ["userFirstName", "userLastName"],
+//       include: [
+//         {
+//           model: Role,
+//           required: true,
+//           where: {
+//             roleName: { [Op.in]: [RoleEnum.BECARIO, RoleEnum.PASANTE] }
+//           },
+//           attributes: []
+//         }
+//       ]
+//     }
+//   ]
+// });
+
+
+//   // 3. Agrupar tareas por usuario + etapa
+//   const grouped: Record<string, { user: string; stage: string; delayedCount: number }> = {};
+
+//   for (const task of tasks) {
+//     const userName = `${task.User.userFirstName} ${task.User.userLastName}`;
+//     const stageName = task.Stage.stageName;
+//     const key = `${userName}-${stageName}`;
+
+//     if (!grouped[key]) {
+//       grouped[key] = {
+//         user: userName,
+//         stage: stageName,
+//         delayedCount: 0
+//       };
+//     }
+
+//     grouped[key].delayedCount++;
+//   }
+
+//   // 4. Convertir a array ordenado por cantidad descendente
+//   return Object.values(grouped).sort((a, b) => b.delayedCount - a.delayedCount);
+// }
+export async function getDelayedTasksByStageAndUser(
+  projectId: string,
+  fechaInicio?: Date,
+  fechaFin?: Date
+) {
   // 1. Obtener ID del estado "ATRASADA"
   const delayedStatus = await TaskStatus.findOne({
     where: { taskStatusName: TaskStatusEnum.DELAYED }
@@ -17,38 +84,52 @@ export async function getDelayedTasksByStageAndUser(projectId: string) {
     throw new Error("No se encontró el estado ATRASADA");
   }
 
-  // 2. Buscar tareas en estado ATRASADA, con Stage y User asociados
-  const tasks = await Task.findAll({
-  where: {
-    taskStatusId: delayedStatus.taskStatusId
-  },
-  include: [
-    {
-      model: Stage,
-      required: true,
-      where: { stageProjectId: projectId },
-      attributes: ["stageName"]
-    },
-    {
-      model: User,
-      required: true,
-      attributes: ["userFirstName", "userLastName"],
-      include: [
-        {
-          model: Role,
-          required: true,
-          where: {
-            roleName: { [Op.in]: [RoleEnum.BECARIO, RoleEnum.PASANTE] }
+  // 2. Armar filtro de fechas si corresponde
+  const dateFilter = (fechaInicio && fechaFin)
+    ? {
+        [Op.or]: [
+          {
+            taskStartDate: { [Op.between]: [fechaInicio, fechaFin] }
           },
-          attributes: []
-        }
-      ]
-    }
-  ]
-});
+          {
+            taskEndDate: { [Op.between]: [fechaInicio, fechaFin] }
+          }
+        ]
+      }
+    : {};
 
+  // 3. Buscar tareas en estado ATRASADA, con Stage y User asociados
+  const tasks = await Task.findAll({
+    where: {
+      taskStatusId: delayedStatus.taskStatusId,
+      ...dateFilter
+    },
+    include: [
+      {
+        model: Stage,
+        required: true,
+        where: { stageProjectId: projectId },
+        attributes: ["stageName"]
+      },
+      {
+        model: User,
+        required: true,
+        attributes: ["userFirstName", "userLastName"],
+        include: [
+          {
+            model: Role,
+            required: true,
+            where: {
+              roleName: { [Op.in]: [RoleEnum.BECARIO, RoleEnum.PASANTE] }
+            },
+            attributes: []
+          }
+        ]
+      }
+    ]
+  });
 
-  // 3. Agrupar tareas por usuario + etapa
+  // 4. Agrupar tareas por usuario + etapa
   const grouped: Record<string, { user: string; stage: string; delayedCount: number }> = {};
 
   for (const task of tasks) {
@@ -67,6 +148,6 @@ export async function getDelayedTasksByStageAndUser(projectId: string) {
     grouped[key].delayedCount++;
   }
 
-  // 4. Convertir a array ordenado por cantidad descendente
+  // 5. Convertir a array ordenado por cantidad descendente
   return Object.values(grouped).sort((a, b) => b.delayedCount - a.delayedCount);
 }
