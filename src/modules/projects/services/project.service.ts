@@ -718,16 +718,18 @@ export async function getOneStage(userLoguedId: string, stageId: string): Promis
 
 
 
-export async function addNewStage(userLoguedId: string, projectId: string, stageName: string, stageOrder: number) {
-  //llamar a la funcion para validar al usuario Activo
+export async function addNewStage(userLoguedId: string, projectId: string, stageName: string) {
+  // Validar usuario activo y rol
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
-  if (!(userRole.roleName == RoleEnum.BECARIO || userRole.roleName == RoleEnum.PASANTE)) { throw new ForbiddenAccessError(); }
+  if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
+    throw new ForbiddenAccessError();
+  }
 
-  //Valido si es miembro
+  // Validar que el usuario sea miembro del proyecto
   await validateProjectMembership(userLoguedId, projectId);
 
-  //Valido el proyecto ingresado: solo se pueden agregar etapas mientras en proyecto este activo
+  // Validar que el proyecto esté activo o en progreso
   const project = await Project.findOne({
     where: { projectId },
     include: [
@@ -738,56 +740,55 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
             [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
           }
         }
-      }]
-
+      }
+    ]
   });
 
   if (!project) {
     throw new NotFoundProjectError();
   }
 
-    //Valido que el nombre ingresado no exista
+  // Verificar que el nombre de etapa no esté repetido dentro del proyecto
   const stageExists = await Stage.findOne({
     where: {
       stageName: stageName,
-      stageProjectId : projectId
-    },
-  });
-  if (stageExists) { throw new NameUsedError() };
-
-  //valido el orden
-  const orderExist = await Stage.findOne({
-    where: {
-      stageOrder: stageOrder,
       stageProjectId: projectId
     }
-  })
-  if (orderExist) { throw new OrderExistsError() };
+  });
+  if (stageExists) {
+    throw new NameUsedError();
+  }
 
-  //obtengo el estado pendiente
-  let status = await StageStatus.findOne({
+  // Obtener el siguiente stageOrder disponible (mayor + 1)
+ const maxOrder = await Stage.max('stageOrder', {
+  where: { stageProjectId: projectId }
+}) as number | null;
+
+  const newStageOrder = (maxOrder ?? 0) + 1;
+
+  // Obtener el estado PENDIENTE
+  const status = await StageStatus.findOne({
     where: {
       stageStatusName: StageStatusEnum.PENDING
     }
   });
-  // console.log(status?.userStatusName)
   if (!status) {
     throw new StatusNotFoundError();
-
   }
 
-  //creo la etapa
+  // Crear la nueva etapa
   const newStage = await Stage.build();
-  newStage.stageName = stageName,
-    newStage.stageOrder = stageOrder,
-    newStage.createdDate = new Date(),
-    newStage.updatedDate = new Date(),
-    newStage.stageStatusId = status.stageStatusId,
-    newStage.stageProjectId = project.projectId
+  newStage.stageName = stageName;
+  newStage.stageOrder = newStageOrder;
+  newStage.createdDate = new Date();
+  newStage.updatedDate = new Date();
+  newStage.stageStatusId = status.stageStatusId;
+  newStage.stageProjectId = project.projectId;
 
-  await newStage.save()
+  await newStage.save();
   return newStage;
 }
+
 
 
 //Función para validar si existe el usuario y si esta en estado activo

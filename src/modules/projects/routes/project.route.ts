@@ -13,6 +13,7 @@ import {AllTaskFiltersSchema} from "../validations/allTaskFilters.schema";
 import {AllStageFiltersSchema} from "../validations/allStagesFilters.schema";
 import {getAllAttachment} from "../../tasks/controllers/attachment.controller";
 import { attachmentFilterSchema } from "../../tasks/schemas/allAttachmentFulter.schema";
+import {updateStageSchema} from "../validations/updateStage.validation";
 
 
 
@@ -41,7 +42,7 @@ projectRouter.post('/:projectId/stages',authenticateToken,checkBlacklist,validat
 
 
 projectRouter.get('/stage/:stageId', authenticateToken,checkBlacklist, getStageById);
-projectRouter.put('/stage/:stageId',authenticateToken,checkBlacklist,validateRequest({body: stageSchema}), updateStage);
+projectRouter.put('/stage/:stageId',authenticateToken,checkBlacklist,validateRequest({body: updateStageSchema}), updateStage);
 projectRouter.delete('/stage/:stageId',authenticateToken,checkBlacklist,  deleteStageToProject);
 
 
