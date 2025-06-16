@@ -197,9 +197,9 @@ export async function createStage(req: Request, res: Response): Promise<void> {
   const { userLoguedId } = (req as any).user;
   const projectId = req.params.projectId;
   const stageName = req.body.stageName;
-  const stageOrder = req.body.stageOrder;
+  //const stageOrder = req.body.stageOrder;
 
-  const newProject = await addNewStage(userLoguedId, projectId, stageName, stageOrder);
+  const newProject = await addNewStage(userLoguedId, projectId, stageName);
   res.status(201).json({
     success: true,
     message: "La etapa ha sido creada exitosamente."

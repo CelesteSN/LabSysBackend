@@ -1,6 +1,6 @@
 import Joi from 'joi';
 
-export const stageSchema = Joi.object({
+export const updateStageSchema = Joi.object({
   stageName: Joi.string()
     .min(3)
     .max(90)
@@ -13,14 +13,14 @@ export const stageSchema = Joi.object({
       'any.required': 'El campo nombre es obligatorio.'
     }),
 
-  // stageOrder: Joi.number()
-  //   .integer()
-  //   .min(1)
-  //   .required()
-  //   .messages({
-  //     'number.base': 'El orden debe ser un número positivo mayor a 0.',
-  //     'number.integer': 'El orden debe ser un número entero.',
-  //     'number.min': 'El orden debe ser mayor a 0.',
-  //     'any.required': 'El campo orden es obligatorio.'
-  //   })
+  stageOrder: Joi.number()
+    .integer()
+    .min(1)
+    .required()
+    .messages({
+      'number.base': 'El orden debe ser un número positivo mayor a 0.',
+      'number.integer': 'El orden debe ser un número entero.',
+      'number.min': 'El orden debe ser mayor a 0.',
+      'any.required': 'El campo orden es obligatorio.'
+    })
 });
