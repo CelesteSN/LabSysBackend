@@ -13,7 +13,7 @@ export async function createTask(req: Request, res: Response) {
     const { userLoguedId } = (req as any).user;
 
     const stageId = req.body.stageId;
-    const taskOrder = req.body.taskOrder;
+    //const taskOrder = req.body.taskOrder;
     const taskName = req.body.taskName;
     const taskDescription = req.body.taskDescription;
     const taskStartDate = req.body.taskStartDate;
@@ -23,7 +23,7 @@ export async function createTask(req: Request, res: Response) {
      // Validación de coherencia de fechas
   validateTaskDates(taskStartDate, taskEndDate);
 
-    const newTask = await addTask(userLoguedId, stageId, taskName, taskOrder, taskStartDate, taskEndDate, taskDescription, priority);
+    const newTask = await addTask(userLoguedId, stageId, taskName, taskStartDate, taskEndDate, taskDescription, priority);
 
     res.status(201).json({
         success: true,

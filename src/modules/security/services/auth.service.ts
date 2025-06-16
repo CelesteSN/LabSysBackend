@@ -142,11 +142,14 @@ if(!(userStatus.userStatusName == UserStatusEnum.ACTIVE)){throw new Error("Usuar
 
   // Construir el cuerpo con reemplazos
  // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
- const recoveryLink = `https://tu-app.com/reset-password/${token}`;
+ //const recoveryLink = `https://tu-app.com/reset-password/${token}`;
 
 const html = await renderTemplate(template.notificationTemplateDescription, {
   userFirstName: user.userFirstName,
-  recoveryLink: recoveryLink
+  userLastName: user.userLastName,
+  //recoveryLink: recoveryLink
+  recoveryLink: `${template.notificationTemplatelinkRedirect}/${token}`
+
 });
 
      await sendEmail(email, template.notificationTemplateEmailSubject, html);

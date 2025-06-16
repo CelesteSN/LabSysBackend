@@ -32,17 +32,17 @@ export const createTaskSchema = Joi.object({
       'string.max': 'El nombre debe tener como máximo 90 caracteres.'
     }),
 
-  taskOrder: Joi.number()
-    .integer()
-    .min(1)
-    .required()
-    .messages({
-      'string.empty': 'El campo orden no puede estar vacío.',
-      'any.required': 'El campo orden es obligatorio.',
-      'number.base': 'El orden debe ser un número entero.',
-      'number.min': 'El orden debe ser mayor a 0.',
-      'number.integer': 'El orden debe ser un número entero sin decimales.'
-    }),
+  // taskOrder: Joi.number()
+  //   .integer()
+  //   .min(1)
+  //   .required()
+  //   .messages({
+  //     'string.empty': 'El campo orden no puede estar vacío.',
+  //     'any.required': 'El campo orden es obligatorio.',
+  //     'number.base': 'El orden debe ser un número entero.',
+  //     'number.min': 'El orden debe ser mayor a 0.',
+  //     'number.integer': 'El orden debe ser un número entero sin decimales.'
+  //   }),
 
   taskDescription: Joi.string()
   .allow('')
