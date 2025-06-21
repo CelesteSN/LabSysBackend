@@ -48,7 +48,7 @@ export const downloadAttachment = async (req: AuthRequest, res: Response) => {
     res.status(200).json({ success: true, url });
   } catch (error: any) {
     console.error("Error al obtener la URL de descarga:", error);
-    res.status(403).json({ error: error.message || "Acceso denegado" });
+    res.status(404).json({ error: error.message || "Acceso denegado" });
   }
 };
 

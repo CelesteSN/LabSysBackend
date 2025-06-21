@@ -31,6 +31,7 @@ import { renderTemplate, sendEmail } from "../../notifications/services/notifica
 import { Role } from "../models/role.model";
 import { Attachment } from "../models/attachment.model";
 import { v2 as cloudinary } from "cloudinary"; // Usualmente se importa así
+import { lowAttachment } from "./attachment.service";
 
 
 
@@ -85,7 +86,7 @@ export async function addTask(
   });
 
   if (!stage1) {
-    throw new NotFoundResultsError();
+    throw new ForbiddenAccessError("No se puede crear la tarea en una etapa finalizada");
   }
 
   const pro = await stage1.getProject();
@@ -639,21 +640,13 @@ export async function lowTask(userLoguedId: string, taskId: string) {
     }
   });
 
-  // 🗑 Eliminar archivos de Cloudinary y luego los registros
+ // Obtener y eliminar attachments con eliminación en Cloudinary
   const attachments = await Attachment.findAll({
-    where: {
-      attachmentTaskId: deletedTask.taskId
-    }
+    where: { attachmentTaskId: taskId }
   });
 
   for (const attachment of attachments) {
-    if (attachment.attachmentCloudinaryId) {
-      try {
-        await cloudinary.uploader.destroy(attachment.attachmentCloudinaryId, { resource_type: "raw" }); // o "image" si son imágenes
-      } catch (error) {
-        console.error(`Error al eliminar archivo Cloudinary: ${attachment.attachmentCloudinaryId}`, error);
-      }
-    }
+    await lowAttachment(userLoguedId, attachment.attachmentId, true);
   }
 
   await Attachment.destroy({
@@ -668,25 +661,29 @@ export async function lowTask(userLoguedId: string, taskId: string) {
   // 🔁 Recalcular etapa y proyecto
   await updateStageProgress(deletedTask.taskStageId);
   await updateOnlyStageDates(deletedTask.taskStageId);
-  await verifyStageAndProjectCompletion(taskStage.stageId)
+  await verifyStageCompletion(taskStage.stageId);
+  await verifyStageAndProjectCompletion(stageProject.projectId)
 
   return;
 }
 
 
-//Funcion para verificar si lo que queda despues de eliminar una tarea o etapa esta finalizado, coloca el proyecto en estado finalizado
-export async function verifyStageAndProjectCompletion(stageId: string): Promise<void> {
+
+//Se encarga de actualizar el estado de la etapa, si todas sus tareas están finalizadas.
+export async function verifyStageCompletion(stageId: string): Promise<void> {
   const stage = await Stage.findByPk(stageId, {
-    include: [{ model: Project }]
+    include: [{ model: StageStatus }]
   });
   if (!stage) return;
 
   const tasks = await Task.findAll({
-    where: { taskStageId: stage.stageId },
+    where: { taskStageId: stageId },
     include: [{ model: TaskStatus, required: true }]
   });
 
-  const allTasksFinished = tasks.length > 0 && tasks.every(
+  if (tasks.length === 0) return; // Si no hay tareas, no hacer nada
+
+  const allTasksFinished = tasks.every(
     t => t.TaskStatus.taskStatusName === TaskStatusEnum.FINISHED
   );
 
@@ -694,30 +691,54 @@ export async function verifyStageAndProjectCompletion(stageId: string): Promise<
     const finishedStageStatus = await StageStatus.findOne({
       where: { stageStatusName: StageStatusEnum.FINISHED }
     });
+
     if (finishedStageStatus) {
       await stage.setStageStatus(finishedStageStatus);
     }
   }
+}
 
-  const project = await stage.getProject();
+
+
+//Se encarga de actualizar el estado del proyecto, según el estado de sus etapas.
+
+export async function verifyStageAndProjectCompletion(projectId: string): Promise<void> {
+  const project = await Project.findByPk(projectId);
+  if (!project) return;
+
   const allStages = await Stage.findAll({
-    where: { stageProjectId: project.projectId },
+    where: { stageProjectId: projectId },
     include: [{ model: StageStatus, required: true }]
   });
 
-  const allStagesFinished = allStages.length > 0 && allStages.every(
+  if (allStages.length === 0) {
+    // No quedan etapas → marcar proyecto como ACTIVO
+    const activeStatus = await ProjectStatus.findOne({
+      where: { projectStatusName: ProjectStatusEnum.ACTIVE }
+    });
+
+    if (activeStatus) {
+      await project.setProjectStatus(activeStatus);
+    }
+
+    return;
+  }
+
+  const allStagesFinished = allStages.every(
     s => s.StageStatus.stageStatusName === StageStatusEnum.FINISHED
   );
 
   if (allStagesFinished) {
-    const finishedProjectStatus = await ProjectStatus.findOne({
+    const finishedStatus = await ProjectStatus.findOne({
       where: { projectStatusName: ProjectStatusEnum.FINISHED }
     });
-    if (finishedProjectStatus) {
-      await project.setProjectStatus(finishedProjectStatus);
+
+    if (finishedStatus) {
+      await project.setProjectStatus(finishedStatus);
     }
   }
 }
+
 
 
 //Función para validar si existe el usuario y si esta en estado activo
@@ -1190,12 +1211,18 @@ await NotificationEmail.create({
 
 
   export async function listTaskStatus(userLoguedId: string) {
-    const userValidated = await validateActiveUser(userLoguedId);
+  const userValidated = await validateActiveUser(userLoguedId);
 
-    const taskStatusList = await TaskStatus.findAll()
+  const taskStatusList = await TaskStatus.findAll({
+    where: {
+      taskStatusName: {
+        [Op.in]: [TaskStatusEnum.FINISHED, TaskStatusEnum.INPROGRESS]
+      }
+    }
+  });
 
-    return taskStatusList
-  }
+  return taskStatusList;
+}
 
 
 

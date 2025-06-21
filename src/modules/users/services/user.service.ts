@@ -209,14 +209,15 @@ import { NotificationEmail } from "../../notifications/models/notificationEmail.
 export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
   const userValidated = await validateActiveUser(userLoguedId);
   const roleUser = await userValidated.getRole();
-  if (roleUser?.roleName !== RoleEnum.TUTOR) throw new ForbiddenAccessError();
+
+  if (roleUser?.roleName !== RoleEnum.TUTOR) {
+    throw new ForbiddenAccessError();
+  }
 
   // Normalizar entradas
   const search = filters?.search?.trim();
   const role = filters?.role?.trim();
   const status = filters?.status?.trim();
-  const fromDate = filters?.fromDate;
-  const toDate = filters?.toDate;
 
   const applySearch = !!search && search.length >= 3;
   const applyRole = !!role;
@@ -231,14 +232,6 @@ export async function listUsers(userLoguedId: string, filters: UserFilter): Prom
       { userFirstName: { [Op.iLike]: `%${search}%` } },
       { userLastName: { [Op.iLike]: `%${search}%` } }
     ];
-  }
-
-  // 📅 Fechas
-  if (fromDate) {
-    where.createdDate = { ...where.createdDate, [Op.gte]: fromDate };
-  }
-  if (toDate) {
-    where.createdDate = { ...where.createdDate, [Op.lte]: toDate };
   }
 
   // 👥 Include (UserStatus y Role)
@@ -256,8 +249,10 @@ export async function listUsers(userLoguedId: string, filters: UserFilter): Prom
     model: Role,
     attributes: ["roleName"],
     where: {
-      ...(applyRole ? { roleName: role } : {}),
-      roleName: { [Op.not]: RoleEnum.TUTOR } // excluir TUTOR siempre
+      [Op.and]: [
+        ...(applyRole ? [{ roleName: role }] : []),
+        { roleName: { [Op.not]: RoleEnum.TUTOR } }
+      ]
     },
     required: true
   });
@@ -273,6 +268,7 @@ export async function listUsers(userLoguedId: string, filters: UserFilter): Prom
 
   return users.map(mapUserToDto);
 }
+
 
 
 
