@@ -25,12 +25,79 @@ import path from 'path';
 
 
 
+// export async function listAttachmentsByProject(
+//   userLoguedId: string,
+//   projectId: string,
+//   filters: AttachmentFilter
+// ): Promise<ProjectAttachmentDto | null> {
+
+//   const userValidated = await validateActiveUser(userLoguedId);
+//   const userRole = await userValidated.getRole();
+
+//   // Si no es tutor, validar que pertenezca al proyecto
+//   if (userRole.roleName !== RoleEnum.TUTOR) {
+//     await validateProjectMembership(userLoguedId, projectId);
+//   }
+
+//   // Filtro de búsqueda: buscar por nombre del archivo, del propietario  y nombre de tarea
+//   const whereSearch: any[] = [];
+//   if (filters.search) {
+//     const searchTerm = `%${filters.search}%`;
+//     whereSearch.push(
+//       { '$User.userFirstName$': { [Op.iLike]: searchTerm } },
+//       { '$User.userLastName$': { [Op.iLike]: searchTerm } },
+//       { '$Task.taskTitle$': { [Op.iLike]: searchTerm } }
+//     );
+//   }
+
+//   const attachmentList = await Attachment.findAll({
+//     attributes: ["attachmentId", "createdDate", "attachmentFileName"],
+//     where: whereSearch.length ? { [Op.or]: whereSearch } : undefined,
+//     include: [
+//       {
+//         model: User,
+//         attributes: ["userFirstName", "userLastName"]
+//       },
+//       {
+//         model: Task,
+//         required: true,
+//         attributes: ["taskTitle"],
+//         include: [{
+//           model: Stage,
+//           required: true,
+//           include: [{
+//             model: Project,
+//             required: true,
+//             where: { projectId },
+//             attributes: ["projectId"],
+//             include: [{
+//               model: ProjectStatus,
+//               attributes: ["projectStatusName"]
+//             }]
+//           }]
+//         }]
+//       }
+//     ],
+//     order: [['createdDate', 'ASC']],
+//     // Paginación opcional:
+//     limit: parseInt(appConfig.ROWS_PER_PAGE),
+//     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
+//   });
+
+//   if (attachmentList.length === 0) return null;
+//   const result = await mapAttachmentsToProjectDto(attachmentList);
+//     return result
+
+// }
+
+
+
+
 export async function listAttachmentsByProject(
   userLoguedId: string,
   projectId: string,
   filters: AttachmentFilter
 ): Promise<ProjectAttachmentDto | null> {
-
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
@@ -39,7 +106,7 @@ export async function listAttachmentsByProject(
     await validateProjectMembership(userLoguedId, projectId);
   }
 
-  // Filtro de búsqueda: buscar por nombre del archivo, del propietario  y nombre de tarea
+  // Filtro de búsqueda: nombre archivo, usuario o tarea
   const whereSearch: any[] = [];
   if (filters.search) {
     const searchTerm = `%${filters.search}%`;
@@ -50,9 +117,32 @@ export async function listAttachmentsByProject(
     );
   }
 
+  // Si no es tutor, filtrar archivos propios o del tutor global
+  let visibilityFilter: any = {};
+  if (userRole.roleName !== RoleEnum.TUTOR) {
+    // Obtener tutor global (se asume único en la base)
+    const tutor = await User.findOne({
+      include: [{ model: Role, where: { roleName: RoleEnum.TUTOR } }]
+    });
+
+    if (!tutor) {
+      throw new Error('No se encontró el usuario con rol TUTOR.');
+    }
+
+    visibilityFilter = {
+      [Op.or]: [
+        { attachmentUserId: userLoguedId },
+        { attachmentUserId: tutor.userId }
+      ]
+    };
+  }
+
   const attachmentList = await Attachment.findAll({
     attributes: ["attachmentId", "createdDate", "attachmentFileName"],
-    where: whereSearch.length ? { [Op.or]: whereSearch } : undefined,
+    where: {
+      ...(whereSearch.length ? { [Op.or]: whereSearch } : {}),
+      ...(userRole.roleName !== RoleEnum.TUTOR ? visibilityFilter : {})
+    },
     include: [
       {
         model: User,
@@ -79,18 +169,14 @@ export async function listAttachmentsByProject(
       }
     ],
     order: [['createdDate', 'ASC']],
-    // Paginación opcional:
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
   });
 
   if (attachmentList.length === 0) return null;
   const result = await mapAttachmentsToProjectDto(attachmentList);
-    return result
-
+  return result;
 }
-
-
 
 
 
@@ -126,21 +212,26 @@ export async function uploadTaskAttachment(
     include: [
       {
         model: TaskStatus,
-        where: { taskStatusName: TaskStatusEnum.INPROGRESS }
+        where: { taskStatusName:{ 
+          [Op.or]:[TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }}
       },
       {
         model: Stage,
         include: [
           {
             model: StageStatus,
-            where: { stageStatusName: StageStatusEnum.INPROGRESS }
+            where: {stageStatusName:{
+                        [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
+                      }
+                    }
           },
           {
             model: Project,
             include: [
               {
                 model: ProjectStatus,
-                where: { projectStatusName: ProjectStatusEnum.INPROGRESS }
+                where: { projectStatusName:{
+                  [Op.or]:[ ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]} }
               }
             ]
           }
@@ -150,7 +241,7 @@ export async function uploadTaskAttachment(
   });
 
   if (!task) {
-    throw new ForbiddenAccessError("Tarea no encontrada o no está en estado en progreso");
+    throw new ForbiddenAccessError("No puede adjuntar archivos a esta tarea");
   }
 
   if (userRole.roleName !== RoleEnum.TUTOR && task.taskUserId !== userLoguedId) {
@@ -240,46 +331,36 @@ export async function getAttachmentUrl(userLoguedId: string, attachmentId: strin
 
 
 
-export async function lowAttachment(userLoguedId: string, attachmentId: string): Promise<void> {
-    const userValidated = await validateActiveUser(userLoguedId);
-    const userRole = await userValidated.getRole();
+export async function lowAttachment(
+  userLoguedId: string,
+  attachmentId: string,
+  force = false
+): Promise<void> {
+  const userValidated = await validateActiveUser(userLoguedId);
+  const userRole = await userValidated.getRole();
 
-  // 1. Buscar el adjunto con info del usuario
   const attachment = await Attachment.findOne({
-    where: { attachmentId: attachmentId,
-      //attachmentUserId: userLoguedId
-    },
-    // include: [
-    //   {
-    //     association: "User", // o el alias definido en tu modelo
-    //     attributes: ["userId"]
-    //   }
-    // ]
+    where: { attachmentId }
   });
 
   if (!attachment) {
     throw new ForbiddenAccessError("El archivo adjunto no existe");
   }
 
-  // 2. Verificar si el usuario logueado es el propietario
-  if (attachment.attachmentUserId !== userLoguedId) {
+  // Solo verificar dueño si no viene forzado desde otra función
+  if (!force && attachment.attachmentUserId !== userLoguedId) {
     throw new ForbiddenAccessError("No tienes permiso para eliminar este archivo");
   }
 
-  // 3. Eliminar de Cloudinary si tiene ID registrado
-  if (attachment.attachmentId) {
+  if (attachment.attachmentCloudinaryId) {
     try {
-     await cloudinary.uploader.destroy(attachment.attachmentCloudinaryId, {
-  resource_type: "raw" // o "image" si es imagen
-});
+      await cloudinary.uploader.destroy(attachment.attachmentCloudinaryId, {
+        resource_type: "raw"
+      });
     } catch (error) {
       console.error("Error al eliminar archivo en Cloudinary:", error);
-      // Podés lanzar error si querés que falle todo, o seguir.
     }
   }
 
-  // 4. Eliminar de la base de datos
-  await Attachment.destroy({
-    where: { attachmentId }
-  });
+  await Attachment.destroy({ where: { attachmentId } });
 }

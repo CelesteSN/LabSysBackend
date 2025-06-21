@@ -5,5 +5,5 @@ export enum UserStatusEnum {
     DELETED = "Dado de baja",
     INACTIVE = "Inactivo",
     REJECTED = "Rechazado",
-    ALL = "Todos"
+    //ALL = "Todos"
 }
