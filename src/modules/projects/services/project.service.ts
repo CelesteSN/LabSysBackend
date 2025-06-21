@@ -36,7 +36,10 @@ import { StageFilter } from "../dtos/stageFilters.dto";
 import { Comment } from "../models/comment.model"
 import { NotificationTemplate } from "../../notifications/models/notificationTemplate.model";
 import { NotificationEmail } from "../../notifications/models/notificationEmail.model";
-import { verifyStageAndProjectCompletion } from "../../tasks/services/task.service";
+import { updateStageProgress, verifyStageAndProjectCompletion, verifyStageCompletion } from "../../tasks/services/task.service";
+import { Attachment } from "../../tasks/models/attachment.model";
+import { lowAttachment } from "../../tasks/services/attachment.service";
+import sequelize from "sequelize";
 
 
 
@@ -436,7 +439,7 @@ export async function addMenmbers(userLoguedId: string, projectId: string, userI
   });
 
   if (!project) {
-    throw new NotFoundResultsError();
+    throw new ForbiddenAccessError("No se pueden agregar miembros en proyectos finalizados o dados de baja");
   }
 
 
@@ -558,8 +561,7 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
 
   // 🔍 Obtener etapas del proyecto
   const projectStages = await Stage.findAll({
-    where: { stageProjectId: projectId },
-    attributes: ['stageId']
+    where: { stageProjectId: projectId }
   });
 
   const stageIds = projectStages.map(stage => stage.stageId);
@@ -568,19 +570,30 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
   const tasksToDelete = await Task.findAll({
     where: {
       taskUserId: userId,
-      taskStageId: {
-        [Op.in]: stageIds
-      }
+      taskStageId: { [Op.in]: stageIds }
     }
   });
 
-  // 🗑 Eliminar comentarios y luego tareas
   for (const task of tasksToDelete) {
-    await Comment.destroy({ where: { commentTaskId: task.taskId } }); // 🔁 Eliminar comentarios
-    await task.destroy(); // 🔁 Eliminar tarea
+    // 📎 Eliminar attachments en Cloudinary y BD
+    const attachments = await Attachment.findAll({
+      where: { attachmentTaskId: task.taskId }
+    });
+
+    for (const attachment of attachments) {
+      await lowAttachment(userLoguedId, attachment.attachmentId, true);
+    }
+
+    // 💬 Eliminar comentarios
+    await Comment.destroy({
+      where: { commentTaskId: task.taskId }
+    });
+
+    // 🗑 Eliminar tarea
+    await task.destroy();
   }
 
-  // ❌ Eliminar la relación del usuario con el proyecto
+  // ❌ Eliminar relación con el proyecto
   const oneProjectUser = await ProjectUser.findOne({
     where: {
       projectUserProjectId: projectId,
@@ -589,17 +602,19 @@ export async function lowMember(userLoguedId: string, projectId: string, userId:
   });
 
   if (!oneProjectUser) throw new NotFoundResultsError();
-
   await oneProjectUser.destroy();
 
-  // 🔁 Recalcular fechas de todas las etapas
+  // 🔁 Recalcular fechas, progreso y estado de cada etapa
   for (const stage of projectStages) {
     await updateStageDates(stage.stageId);
-    // También podrías llamar a updateStageProgress(stage.stageId);
+    await updateStageProgress(stage.stageId);
+    await verifyStageCompletion(stage.stageId);
   }
 
-  return;
+  // ✅ Verificar estado general del proyecto
+  await verifyStageAndProjectCompletion(projectId);
 }
+
 
 
 export async function listStages(
@@ -907,9 +922,7 @@ export async function lowStage(userLoguedId: string, stageId: string) {
     include: [
       {
         model: StageStatus,
-        where: {
-          stageStatusName: StageStatusEnum.PENDING
-          }
+        where: { stageStatusName: StageStatusEnum.PENDING }
       }
     ]
   });
@@ -921,29 +934,41 @@ export async function lowStage(userLoguedId: string, stageId: string) {
   // Obtener el proyecto de la etapa
   const projectStage = await deletedStage.getProject();
 
-  // Validar membresía
+  // Validar que el usuario sea miembro del proyecto
   await validateProjectMembership(userLoguedId, projectStage.projectId);
 
-  // 🔍 Obtener tareas asociadas a la etapa
+  // Obtener tareas de la etapa
   const tasks = await Task.findAll({
     where: { taskStageId: deletedStage.stageId }
   });
 
-  // 🔁 Eliminar comentarios y tareas una por una
   for (const task of tasks) {
+    // Eliminar attachments asociados
+    const attachments = await Attachment.findAll({
+      where: { attachmentTaskId: task.taskId }
+    });
+
+    for (const attachment of attachments) {
+      await lowAttachment(userLoguedId, attachment.attachmentId, true); // usar `force = true`
+    }
+
+    // Eliminar comentarios asociados
     await Comment.destroy({
       where: { commentTaskId: task.taskId }
     });
 
+    // Eliminar la tarea
     await task.destroy();
   }
 
-  // 🗑 Eliminar la etapa
+  // Eliminar la etapa
   await deletedStage.destroy();
-  await verifyStageAndProjectCompletion(stageId)
 
-  return;
+  // Verificar si se deben actualizar estados de etapa/proyecto
+  await verifyStageAndProjectCompletion(projectStage.projectId);
+
 }
+
 
 
 

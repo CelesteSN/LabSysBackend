@@ -120,17 +120,6 @@ if(!(userStatus.userStatusName == UserStatusEnum.ACTIVE)){throw new Error("Usuar
   await newPasswordToken.save();
   
 
-  // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
-  // const html = `
-  //   <p>Estimado/a ${user.userFirstName},</p>
-  //   <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-  //   <p>Debe ingresar al siguiente enlace para continuar:</p>
-  //   <p><a href="${recoveryLink}">${recoveryLink}</a></p>
-  //   <p>Si no fue usted, ignore este mensaje.</p>
-  //       <p>Muchas gracias.</p>
-  // `;
-
-  // await sendEmail(email, 'Recuperación de contraseña', html);
   // Obtener plantilla de recuperación
   const template = await NotificationTemplate.findOne({
     where: { notificationTemplateName: "RECOVERY_PASSWORD" }
@@ -141,13 +130,10 @@ if(!(userStatus.userStatusName == UserStatusEnum.ACTIVE)){throw new Error("Usuar
   }
 
   // Construir el cuerpo con reemplazos
- // const recoveryLink = `https://tu-app.com/reset-password/${token}`;
- //const recoveryLink = `https://tu-app.com/reset-password/${token}`;
-
+ 
 const html = await renderTemplate(template.notificationTemplateDescription, {
   userFirstName: user.userFirstName,
   userLastName: user.userLastName,
-  //recoveryLink: recoveryLink
   recoveryLink: `${template.notificationTemplatelinkRedirect}/${token}`
 
 });
@@ -158,11 +144,7 @@ const html = await renderTemplate(template.notificationTemplateDescription, {
   await NotificationEmail.create({
     notificationEmailUserId: user.userId,
     notificationEmailNotTemplateId: template.notificationTemplateId,
-    //emailTo: user.userEmail,
-    //emailStatus: "PENDING",
     createdDate: new Date(),
-    //emailSubject: template.emailSubject,
-    //emailHtml: html // campo opcional si querés guardar el cuerpo ya procesado
   });
 }
 
@@ -181,7 +163,7 @@ export async function verifyRecoveryTokenService(token: string) {
     });
 
     if(!tokenSaved)
-      {return { success: false, message: "El Token no fue encontrado o ya fue utilizado", status: 404 };}
+      {return { success: false, message: "El enlace al que está intentando acceder ha expirado. Por favor, solicite un nuevo enlace si requiere modificar su contraseña.", status: 404 };}
     if(tokenSaved.expirationDate < new Date())
       return { success: false, message: "El enlace al que está intentando acceder ha expirado. Por favor, solicite un nuevo enlace si requiere modificar su contraseña.", status: 410 }; // 410 Gone
 
@@ -315,7 +297,7 @@ export const verifyTokenService = async (token: string) => {
     };
 
   } catch (error: any) {
-    throw new Error('Token inválido o expirado');
+    throw new Error('No cuenta con los permisos necesarios para acceder a este recurso');
   }
 };
 
