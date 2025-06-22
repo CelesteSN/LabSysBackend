@@ -213,7 +213,7 @@ export async function uploadTaskAttachment(
       {
         model: TaskStatus,
         where: { taskStatusName:{ 
-          [Op.or]:[TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING] }}
+          [Op.or]:[TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING, TaskStatusEnum.DELAYED] }}
       },
       {
         model: Stage,

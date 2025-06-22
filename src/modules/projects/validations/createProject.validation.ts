@@ -6,10 +6,12 @@ export const projectValidationSchema = Joi.object({
     .min(3)
     .max(255)
     .required()
+    .pattern(/^[a-zA-Z0-9 _-]+$/, 'letras, números, espacios, guiones')
     .messages({
-      "string.empty": "El nombre del proyecto es obligatorio.",
-      "string.min": "El nombre del proyecto debe tener al menos 3 caracteres.",
-      "string.max": "El nombre del proyecto no puede superar los 255 caracteres."
+      'string.pattern.name': 'El campo nombre solo puede contener letras, números, espacios, guiones medios y guiones bajos.',
+      "string.empty": "El nombre es obligatorio.",
+      "string.min": "El campo nombre debe tener al menos 3 caracteres.",
+      "string.max": "El campo nombre no puede superar los 255 caracteres."
     }),
 
   projectTypeId: Joi.string()
