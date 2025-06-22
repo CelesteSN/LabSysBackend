@@ -427,10 +427,30 @@ export async function modifyTask(
     throw new ForbiddenAccessError("No se puede modificar una tarea finalizada");
   }
 
+//valido si el estado es uno de los predefinidos
+  const validStatus = await TaskStatus.findOne({ where: { taskStatusId: taskStatus } });
+  if (!validStatus) throw new StatusNotFoundError();
 
-  if(updatedTask.TaskStatus.taskStatusName == TaskStatusEnum.DELAYED && taskStatus != TaskStatusEnum.FINISHED){
-    throw new ForbiddenAccessError("No es posible pasar una tarea atrasada a este estado");
+
+  if(updatedTask.TaskStatus.taskStatusName == TaskStatusEnum.DELAYED && validStatus.taskStatusName != TaskStatusEnum.FINISHED){
+  
+      const today = startOfDay(new Date());
+const endDate = startOfDay(parse(taskEndDate, 'dd-MM-yyyy', new Date()));
+
+if (endDate < today) {
+      throw new ForbiddenAccessError("No es posible pasar una tarea atrasada a este estado, modifique la fecha de finalización y luego continue");
+}
+
   }
+
+const startDate = startOfDay(parse(taskStartDate, 'dd-MM-yyyy', new Date()));
+  const endDate = startOfDay(parse(taskEndDate, 'dd-MM-yyyy', new Date()));
+
+  // Verificar que la fecha de finalización no sea anterior a la de inicio
+  if (isBefore(endDate, startDate)) {
+    throw new ForbiddenAccessError('La fecha de finalización debe ser igual o posterior a la fecha de inicio.');
+  }
+
   //Obtengo la etapa y proyecto asociado
   const stageAux = await updatedTask.getStage();
   const proy = await stageAux.getProject();
@@ -462,9 +482,7 @@ export async function modifyTask(
   if (orderExist) throw new OrderExistsError();
 
 
-  //valido si el estado es uno de los predefinidos
-  const validStatus = await TaskStatus.findOne({ where: { taskStatusId: taskStatus } });
-  if (!validStatus) throw new StatusNotFoundError();
+  
 
 
   //obtengo el estado de la etapa y del proyecto
@@ -920,7 +938,7 @@ export async function addComment(userLoguedId: string, taskId: string, commentDe
         model: TaskStatus,
         where: {
           taskStatusName: {
-            [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING]
+            [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING, TaskStatusEnum.DELAYED]
           }
         },
         attributes: ["taskStatusName"]
@@ -1214,11 +1232,11 @@ await NotificationEmail.create({
   const userValidated = await validateActiveUser(userLoguedId);
 
   const taskStatusList = await TaskStatus.findAll({
-    where: {
-      taskStatusName: {
-        [Op.in]: [TaskStatusEnum.FINISHED, TaskStatusEnum.INPROGRESS]
-      }
-    }
+    // where: {
+    //   taskStatusName: {
+    //     [Op.in]: [TaskStatusEnum.FINISHED, TaskStatusEnum.INPROGRESS]
+    //   }
+    // }
   });
 
   return taskStatusList;

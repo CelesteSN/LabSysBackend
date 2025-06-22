@@ -54,7 +54,7 @@ export async function updateTask(req: Request, res: Response) {
     const priority = req.body.taskPriority != null ? Number(req.body.taskPriority) : undefined;
 
 // Validación de coherencia de fechas
-  validateTaskDates(taskStartDate, taskEndDate);
+  //validateTaskDates(taskStartDate, taskEndDate);
     await modifyTask(userLoguedId, taskId, taskName, taskOrder, taskStartDate, taskEndDate, taskStatusId, taskDescription, priority);
     res.status(200).json({
         success: true,
