@@ -775,11 +775,16 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
   }
 
   // Obtener el siguiente stageOrder disponible (mayor + 1)
- const maxOrder = await Stage.max('stageOrder', {
-  where: { stageProjectId: projectId }
-}) as number | null;
+  const maxOrder = await Stage.max('stageOrder', {
+    where: { stageProjectId: projectId }
+  }) as number | null;
 
   const newStageOrder = (maxOrder ?? 0) + 1;
+
+  // ❌ Validar que no se exceda el límite
+  if (newStageOrder > 50) {
+    throw new ForbiddenAccessError("No se pueden agregar más de 50 etapas a un proyecto.");
+  }
 
   // Obtener el estado PENDIENTE
   const status = await StageStatus.findOne({
@@ -803,6 +808,7 @@ export async function addNewStage(userLoguedId: string, projectId: string, stage
   await newStage.save();
   return newStage;
 }
+
 
 
 
@@ -846,13 +852,12 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
   const userRole = await userValidated.getRole();
 
   if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
-    throw new ForbiddenAccessError()
+    throw new ForbiddenAccessError();
   }
 
-  //Obtener el proyecto a partir de la etapa
-  //Valido el proyecto ingresado
+  // Obtener la etapa solo si está en estado IN PROGRESS o PENDING
   const stageUpdated = await Stage.findOne({
-    where: { "stageId": stageId },
+    where: { stageId },
     include: [
       {
         model: StageStatus,
@@ -861,7 +866,7 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
             [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
           }
         },
-      },
+      }
     ]
   });
 
@@ -870,42 +875,49 @@ export async function modifyStage(userLoguedId: string, stageId: string, stageNa
   }
 
   const pro = await stageUpdated.getProject();
-  //Validar que este asignado al proyecto
+
+  // Validar que el usuario pertenezca al proyecto
   await validateProjectMembership(userLoguedId, pro.projectId);
 
-
-  //Valido que el nombre ingresado no exista
+  // Validar nombre duplicado (excluyendo esta misma etapa)
   const stageNameExists = await Stage.findOne({
     where: {
-      stageName: stageName,
+      stageName,
       stageProjectId: pro.projectId,
-      stageId: { [Op.ne]: stageId } // excluye la etapa actual
-    },
+      stageId: { [Op.ne]: stageId }
+    }
   });
-  if (stageNameExists) { throw new NameUsedError() };
+  if (stageNameExists) {
+    throw new NameUsedError();
+  }
 
-
-  //valido el orden
+  // Validar orden duplicado (excluyendo esta misma etapa)
   const orderExist = await Stage.findOne({
     where: {
-      stageOrder: stageOrder,
+      stageOrder,
       stageProjectId: pro.projectId,
-      stageId: { [Op.ne]: stageId } // excluye la etapa actual
-
+      stageId: { [Op.ne]: stageId }
     }
-  })
-  if (orderExist) { throw new OrderExistsError() };
+  });
+  if (orderExist) {
+    throw new OrderExistsError();
+  }
 
+  // 🔒 Validar que el nuevo orden no supere 50
+  if (stageOrder > 50) {
+    throw new ForbiddenAccessError("El orden no puede superar 50.");
+  }
 
+  // Aplicar cambios
   stageUpdated.stageName = stageName;
   stageUpdated.stageOrder = stageOrder;
   stageUpdated.updatedDate = new Date();
 
-
-  await stageUpdated.save(); // Guardar los cambios en la base de datos
+  await stageUpdated.save();
 
   return stageUpdated;
 }
+
 
 
 

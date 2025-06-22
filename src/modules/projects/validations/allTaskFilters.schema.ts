@@ -14,6 +14,7 @@ export const AllTaskFiltersSchema = Joi.object({
       'En progreso',
       'Dado de baja',
       'Finalizada',
+      "Atrasada",
       'Todos'
     )
     .messages({

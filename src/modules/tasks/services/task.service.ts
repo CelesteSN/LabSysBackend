@@ -36,10 +36,6 @@ import { lowAttachment } from "./attachment.service";
 
 
 
-
-
-
-
 export async function addTask(
   userLoguedId: string,
   stageId: string,
@@ -56,7 +52,7 @@ export async function addTask(
     throw new ForbiddenAccessError();
   }
 
-  // Validar etapa y proyecto asociado
+  // Obtener la etapa y proyecto asociados
   const stage1 = await Stage.findOne({
     where: { stageId },
     include: [
@@ -86,33 +82,49 @@ export async function addTask(
   });
 
   if (!stage1) {
-    throw new ForbiddenAccessError("No se puede crear la tarea en una etapa finalizada");
+    throw new ForbiddenAccessError("No se puede crear la tarea en una etapa finalizada.");
   }
 
-  const pro = await stage1.getProject();
-  await validateProjectMembership(userLoguedId, pro.projectId);
+  const project = await stage1.getProject();
+  await validateProjectMembership(userLoguedId, project.projectId);
 
-  // Validar que no exista otra tarea con el mismo nombre
+  // 🔍 Obtener todas las etapas del proyecto
+  const allStages = await Stage.findAll({
+    where: { stageProjectId: project.projectId },
+    attributes: ["stageId"]
+  });
+  const stageIds = allStages.map(s => s.stageId);
+
+  // 🔍 Validar que el nombre de la tarea no exista en ninguna etapa del proyecto
   const taskExists = await Task.findOne({
     where: {
       taskTitle: taskName,
-      taskStageId: stageId
+      taskStageId: { [Op.in]: stageIds }
     }
   });
+
   if (taskExists) {
     throw new NameUsedError();
   }
 
-  // Obtener el próximo orden disponible
-  const maxOrder = await Task.max('taskOrder', {
-    where: { taskStageId: stageId }
+  // ✅ Obtener el máximo taskOrder en todas las tareas del proyecto
+  const maxOrder = await Task.max("taskOrder", {
+    where: {
+      taskStageId: { [Op.in]: stageIds }
+    }
   }) as number | null;
+
   const newTaskOrder = (maxOrder ?? 0) + 1;
+
+  if (newTaskOrder > 99) {
+    throw new ForbiddenAccessError("No se pueden agregar más de 99 tareas en este proyecto.");
+  }
 
   // Obtener estado PENDIENTE
   const statusPending = await TaskStatus.findOne({
     where: { taskStatusName: TaskStatusEnum.PENDING }
   });
+
   if (!statusPending) {
     throw new StatusNotFoundError();
   }
@@ -135,6 +147,7 @@ export async function addTask(
   newTask.taskStatusId = statusPending.taskStatusId;
   newTask.taskUserId = userValidated.userId;
 
+  // Validar que las fechas estén dentro del proyecto
   await validateTaskDateWithinProjectLimits(
     newTask.taskStageId,
     newTask.taskStartDate,
@@ -142,11 +155,126 @@ export async function addTask(
   );
 
   await newTask.save();
+
+  // Actualizar progreso y fechas de la etapa
   await updateStageProgress(newTask.taskStageId);
   await updateStageDates(newTask.taskStageId);
 
-  return;
+  return newTask;
 }
+
+
+
+
+
+// export async function addTask(
+
+//   userLoguedId: string,
+//   stageId: string,
+//   taskName: string,
+//   taskStartDate: string,
+//   taskEndDate: string,
+//   taskDescription?: string,
+//   priority?: number
+// ) {
+//   const userValidated = await validateActiveUser(userLoguedId);
+//   const userRole = await userValidated.getRole();
+
+//   if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
+//     throw new ForbiddenAccessError();
+//   }
+
+//   // Validar etapa y proyecto asociado
+//   const stage1 = await Stage.findOne({
+//     where: { stageId },
+//     include: [
+//       {
+//         model: StageStatus,
+//         where: {
+//           stageStatusName: {
+//             [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
+//           }
+//         }
+//       },
+//       {
+//         model: Project,
+//         include: [
+//           {
+//             model: ProjectStatus,
+//             where: {
+//               projectStatusName: {
+//                 [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+//               }
+//             },
+//             attributes: ["projectStatusName"]
+//           }
+//         ]
+//       }
+//     ]
+//   });
+
+//   if (!stage1) {
+//     throw new ForbiddenAccessError("No se puede crear la tarea en una etapa finalizada");
+//   }
+
+//   const pro = await stage1.getProject();
+//   await validateProjectMembership(userLoguedId, pro.projectId);
+
+//   // Validar que no exista otra tarea con el mismo nombre
+//   const taskExists = await Task.findOne({
+//     where: {
+//       taskTitle: taskName,
+//       taskStageId: stageId
+//     }
+//   });
+//   if (taskExists) {
+//     throw new NameUsedError();
+//   }
+
+//   // Obtener el próximo orden disponible
+//   const maxOrder = await Task.max('taskOrder', {
+//     where: { taskStageId: stageId }
+//   }) as number | null;
+//   const newTaskOrder = (maxOrder ?? 0) + 1;
+
+//   // Obtener estado PENDIENTE
+//   const statusPending = await TaskStatus.findOne({
+//     where: { taskStatusName: TaskStatusEnum.PENDING }
+//   });
+//   if (!statusPending) {
+//     throw new StatusNotFoundError();
+//   }
+
+//   // Crear nueva tarea
+//   const newTask = Task.build();
+//   newTask.taskTitle = taskName;
+//   newTask.taskDescription = taskDescription || null;
+//   newTask.taskOrder = newTaskOrder;
+
+//   if (priority != null) {
+//     newTask.taskPriority = Number(priority);
+//   }
+
+//   newTask.createdDate = new Date();
+//   newTask.updatedDate = new Date();
+//   newTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date());
+//   newTask.taskEndDate = parse(taskEndDate, 'dd-MM-yyyy', new Date());
+//   newTask.taskStageId = stage1.stageId;
+//   newTask.taskStatusId = statusPending.taskStatusId;
+//   newTask.taskUserId = userValidated.userId;
+
+//   await validateTaskDateWithinProjectLimits(
+//     newTask.taskStageId,
+//     newTask.taskStartDate,
+//     newTask.taskEndDate
+//   );
+
+//   await newTask.save();
+//   await updateStageProgress(newTask.taskStageId);
+//   await updateStageDates(newTask.taskStageId);
+
+//   return;
+// }
 
 
 
@@ -359,7 +487,6 @@ export async function getOneTask(userLoguedId: string, taskId: string): Promise<
 }
 
 
-
 export async function modifyTask(
   userLoguedId: string,
   taskId: string,
@@ -374,7 +501,7 @@ export async function modifyTask(
   const userValidated = await validateActiveUser(userLoguedId);
   const userRole = await userValidated.getRole();
 
-  if (!(userRole.roleName == RoleEnum.BECARIO || userRole.roleName == RoleEnum.PASANTE)) {
+  if (!(userRole.roleName === RoleEnum.BECARIO || userRole.roleName === RoleEnum.PASANTE)) {
     throw new ForbiddenAccessError();
   }
 
@@ -391,7 +518,7 @@ export async function modifyTask(
       },
       {
         model: Stage,
-        attributes: ["stageName"],
+        attributes: ["stageName", "stageId"],
         include: [
           {
             model: StageStatus,
@@ -421,131 +548,329 @@ export async function modifyTask(
 
   if (!updatedTask) throw new NotFoundResultsError();
 
-  // 🚫 Bloquear modificación si la tarea ya está finalizada
   const currentTaskStatus = await updatedTask.getTaskStatus();
   if (currentTaskStatus.taskStatusName === TaskStatusEnum.FINISHED) {
     throw new ForbiddenAccessError("No se puede modificar una tarea finalizada");
   }
 
-//valido si el estado es uno de los predefinidos
   const validStatus = await TaskStatus.findOne({ where: { taskStatusId: taskStatus } });
   if (!validStatus) throw new StatusNotFoundError();
 
+  if (
+    updatedTask.TaskStatus.taskStatusName == TaskStatusEnum.DELAYED &&
+    validStatus.taskStatusName != TaskStatusEnum.FINISHED
+  ) {
+    const today = startOfDay(new Date());
+    const endDate = startOfDay(parse(taskEndDate, 'dd-MM-yyyy', new Date()));
 
-  if(updatedTask.TaskStatus.taskStatusName == TaskStatusEnum.DELAYED && validStatus.taskStatusName != TaskStatusEnum.FINISHED){
-  
-      const today = startOfDay(new Date());
-const endDate = startOfDay(parse(taskEndDate, 'dd-MM-yyyy', new Date()));
-
-if (endDate < today) {
-      throw new ForbiddenAccessError("No es posible pasar una tarea atrasada a este estado, modifique la fecha de finalización y luego continue");
-}
-
+    if (endDate < today) {
+      throw new ForbiddenAccessError(
+        "No es posible pasar una tarea atrasada a este estado. Modifique la fecha de finalización y luego continúe."
+      );
+    }
   }
 
-const startDate = startOfDay(parse(taskStartDate, 'dd-MM-yyyy', new Date()));
+  const startDate = startOfDay(parse(taskStartDate, 'dd-MM-yyyy', new Date()));
   const endDate = startOfDay(parse(taskEndDate, 'dd-MM-yyyy', new Date()));
 
-  // Verificar que la fecha de finalización no sea anterior a la de inicio
   if (isBefore(endDate, startDate)) {
-    throw new ForbiddenAccessError('La fecha de finalización debe ser igual o posterior a la fecha de inicio.');
+    throw new ForbiddenAccessError("La fecha de finalización debe ser igual o posterior a la de inicio.");
   }
 
-  //Obtengo la etapa y proyecto asociado
   const stageAux = await updatedTask.getStage();
   const proy = await stageAux.getProject();
 
-  //Valido si es miembro del proyecto
   if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
     throw new ForbiddenAccessError();
   }
 
-  //valido siel nombre ya existe
+  // 🔍 Validar que el nombre de la tarea no exista en ninguna etapa del proyecto (excepto esta)
+  const allStages = await Stage.findAll({
+    where: { stageProjectId: proy.projectId },
+    attributes: ['stageId']
+  });
+  const stageIds = allStages.map(s => s.stageId);
+
   const taskNameExists = await Task.findOne({
     where: {
       taskTitle: taskName,
-      taskStageId: stageAux.stageId,
+      taskStageId: { [Op.in]: stageIds },
       taskId: { [Op.ne]: taskId }
     }
   });
   if (taskNameExists) throw new NameUsedError();
 
-
-  //valido si el orden ya existe
-  const orderExist = await Task.findOne({
+  // 🔁 Validar que el orden no esté usado por otra tarea en el proyecto
+  const orderExists = await Task.findOne({
     where: {
       taskOrder,
-      taskStageId: stageAux.stageId,
+      taskStageId: { [Op.in]: stageIds },
       taskId: { [Op.ne]: taskId }
     }
   });
-  if (orderExist) throw new OrderExistsError();
+  if (orderExists) throw new OrderExistsError();
 
+  // 🔒 Límite de orden
+  if (taskOrder > 99) {
+    throw new ForbiddenAccessError("El orden no puede superar 99.");
+  }
 
-  
-
-
-  //obtengo el estado de la etapa y del proyecto
   const stageStatus = await stageAux.getStageStatus();
   const projectStatus = await proy.getProjectStatus();
 
-  // Si una tarea pasa a EN PROGRESO
   if (validStatus.taskStatusName === TaskStatusEnum.INPROGRESS) {
     if (stageStatus.stageStatusName === StageStatusEnum.PENDING) {
-      const inProgressStageStatus = await StageStatus.findOne({ where: { stageStatusName: StageStatusEnum.INPROGRESS } });
+      const inProgressStageStatus = await StageStatus.findOne({
+        where: { stageStatusName: StageStatusEnum.INPROGRESS }
+      });
       if (inProgressStageStatus) await stageAux.setStageStatus(inProgressStageStatus);
     }
+
     if (projectStatus.projectStatusName === ProjectStatusEnum.ACTIVE) {
-      const inProgressProjectStatus = await ProjectStatus.findOne({ where: { projectStatusName: ProjectStatusEnum.INPROGRESS } });
+      const inProgressProjectStatus = await ProjectStatus.findOne({
+        where: { projectStatusName: ProjectStatusEnum.INPROGRESS }
+      });
       if (inProgressProjectStatus) await proy.setProjectStatus(inProgressProjectStatus);
     }
   }
 
-  
-//Valido si las nuevas fechas ingresadas no extienden los limites del proyecto
   const parsedStart = parse(taskStartDate, 'dd-MM-yyyy', new Date());
   const parsedEnd = parse(taskEndDate, 'dd-MM-yyyy', new Date());
+
   await validateTaskDateWithinProjectLimits(updatedTask.taskStageId, parsedStart, parsedEnd);
 
-  //Actualizo la tarea
   updatedTask.taskTitle = taskName;
   updatedTask.taskOrder = taskOrder;
   updatedTask.taskStartDate = parsedStart;
   updatedTask.taskEndDate = parsedEnd;
-  if (priority != null) updatedTask.taskPriority = Number(priority);
+  updatedTask.taskPriority = priority ?? null;
   updatedTask.taskDescription = taskDescription || null;
-  updatedTask.taskStatusId =  await validStatus.taskStatusId;
+  updatedTask.taskStatusId = validStatus.taskStatusId;
   updatedTask.updatedDate = new Date();
 
   await updatedTask.save();
 
-  //actualizo el progreso
   await updateStageProgress(updatedTask.taskStageId);
-
-  //actualizo las fechas de la etapa
   await updateStageDates(updatedTask.taskStageId);
 
-// Si todas las tareas están finalizadas, cambiar a FINALIZADO
-if(validStatus.taskStatusName == TaskStatusEnum.FINISHED){
-  const tasksOfStage = await Task.findAll({ where: { taskStageId: stageAux.stageId }, include: [TaskStatus] });
-  const allFinished = tasksOfStage.every(t => t.TaskStatus?.taskStatusName === TaskStatusEnum.FINISHED);
-  if (allFinished) {
-    const finishedStageStatus = await StageStatus.findOne({ where: { stageStatusName: StageStatusEnum.FINISHED } });
-    if (finishedStageStatus) await stageAux.setStageStatus(finishedStageStatus);
+  if (validStatus.taskStatusName == TaskStatusEnum.FINISHED) {
+    const tasksOfStage = await Task.findAll({
+      where: { taskStageId: stageAux.stageId },
+      include: [TaskStatus]
+    });
 
-    const allStages = await Stage.findAll({ where: { stageProjectId: proy.projectId }, include: [StageStatus] });
-    const allStagesFinished = allStages.every(s => s.StageStatus?.stageStatusName === StageStatusEnum.FINISHED);
-    if (allStagesFinished) {
-      const finishedProjectStatus = await ProjectStatus.findOne({ where: { projectStatusName: ProjectStatusEnum.FINISHED } });
-      if (finishedProjectStatus) await proy.setProjectStatus(finishedProjectStatus);
+    const allFinished = tasksOfStage.every(
+      t => t.TaskStatus?.taskStatusName === TaskStatusEnum.FINISHED
+    );
+
+    if (allFinished) {
+      const finishedStageStatus = await StageStatus.findOne({
+        where: { stageStatusName: StageStatusEnum.FINISHED }
+      });
+      if (finishedStageStatus) await stageAux.setStageStatus(finishedStageStatus);
+
+      const allStagesFinished = (await Stage.findAll({
+        where: { stageProjectId: proy.projectId },
+        include: [StageStatus]
+      })).every(s => s.StageStatus?.stageStatusName === StageStatusEnum.FINISHED);
+
+      if (allStagesFinished) {
+        const finishedProjectStatus = await ProjectStatus.findOne({
+          where: { projectStatusName: ProjectStatusEnum.FINISHED }
+        });
+        if (finishedProjectStatus) await proy.setProjectStatus(finishedProjectStatus);
+      }
     }
   }
-}
 
-  // ✅ Verificar si la etapa y el proyecto deben actualizar su estado a FINALIZADO
-//await checkAndUpdateStageAndProjectStatusFromTask(updatedTask.taskId);
   return updatedTask;
 }
+
+
+
+// export async function modifyTask(
+//   userLoguedId: string,
+//   taskId: string,
+//   taskName: string,
+//   taskOrder: number,
+//   taskStartDate: string,
+//   taskEndDate: string,
+//   taskStatus: string,
+//   taskDescription?: string,
+//   priority?: number
+// ): Promise<Task | null> {
+//   const userValidated = await validateActiveUser(userLoguedId);
+//   const userRole = await userValidated.getRole();
+
+//   if (!(userRole.roleName == RoleEnum.BECARIO || userRole.roleName == RoleEnum.PASANTE)) {
+//     throw new ForbiddenAccessError();
+//   }
+
+//   const updatedTask = await Task.findOne({
+//     where: { taskId, taskUserId: userLoguedId },
+//     include: [
+//       {
+//         model: TaskStatus,
+//         attributes: ["taskStatusName"]
+//       },
+//       {
+//         model: User,
+//         where: { userId: userLoguedId }
+//       },
+//       {
+//         model: Stage,
+//         attributes: ["stageName"],
+//         include: [
+//           {
+//             model: StageStatus,
+//             where: {
+//               stageStatusName: {
+//                 [Op.or]: [StageStatusEnum.INPROGRESS, StageStatusEnum.PENDING]
+//               }
+//             }
+//           },
+//           {
+//             model: Project,
+//             include: [
+//               {
+//                 model: ProjectStatus,
+//                 where: {
+//                   projectStatusName: {
+//                     [Op.or]: [ProjectStatusEnum.INPROGRESS, ProjectStatusEnum.ACTIVE]
+//                   }
+//                 }
+//               }
+//             ]
+//           }
+//         ]
+//       }
+//     ]
+//   });
+
+//   if (!updatedTask) throw new NotFoundResultsError();
+
+//   // 🚫 Bloquear modificación si la tarea ya está finalizada
+//   const currentTaskStatus = await updatedTask.getTaskStatus();
+//   if (currentTaskStatus.taskStatusName === TaskStatusEnum.FINISHED) {
+//     throw new ForbiddenAccessError("No se puede modificar una tarea finalizada");
+//   }
+
+// //valido si el estado es uno de los predefinidos
+//   const validStatus = await TaskStatus.findOne({ where: { taskStatusId: taskStatus } });
+//   if (!validStatus) throw new StatusNotFoundError();
+
+
+//   if(updatedTask.TaskStatus.taskStatusName == TaskStatusEnum.DELAYED && validStatus.taskStatusName != TaskStatusEnum.FINISHED){
+  
+//       const today = startOfDay(new Date());
+// const endDate = startOfDay(parse(taskEndDate, 'dd-MM-yyyy', new Date()));
+
+// if (endDate < today) {
+//       throw new ForbiddenAccessError("No es posible pasar una tarea atrasada a este estado, modifique la fecha de finalización y luego continue");
+// }
+
+//   }
+
+// const startDate = startOfDay(parse(taskStartDate, 'dd-MM-yyyy', new Date()));
+//   const endDate = startOfDay(parse(taskEndDate, 'dd-MM-yyyy', new Date()));
+
+//   // Verificar que la fecha de finalización no sea anterior a la de inicio
+//   if (isBefore(endDate, startDate)) {
+//     throw new ForbiddenAccessError('La fecha de finalización debe ser igual o posterior a la fecha de inicio.');
+//   }
+
+//   //Obtengo la etapa y proyecto asociado
+//   const stageAux = await updatedTask.getStage();
+//   const proy = await stageAux.getProject();
+
+//   //Valido si es miembro del proyecto
+//   if (!(await validateProjectMembershipWhitReturn(userValidated.userId, proy.projectId))) {
+//     throw new ForbiddenAccessError();
+//   }
+
+//   //valido siel nombre ya existe
+//   const taskNameExists = await Task.findOne({
+//     where: {
+//       taskTitle: taskName,
+//       taskStageId: stageAux.stageId,
+//       taskId: { [Op.ne]: taskId }
+//     }
+//   });
+//   if (taskNameExists) throw new NameUsedError();
+
+
+//   //valido si el orden ya existe
+//   const orderExist = await Task.findOne({
+//     where: {
+//       taskOrder,
+//       taskStageId: stageAux.stageId,
+//       taskId: { [Op.ne]: taskId }
+//     }
+//   });
+//   if (orderExist) throw new OrderExistsError();
+
+
+//   //obtengo el estado de la etapa y del proyecto
+//   const stageStatus = await stageAux.getStageStatus();
+//   const projectStatus = await proy.getProjectStatus();
+
+//   // Si una tarea pasa a EN PROGRESO
+//   if (validStatus.taskStatusName === TaskStatusEnum.INPROGRESS) {
+//     if (stageStatus.stageStatusName === StageStatusEnum.PENDING) {
+//       const inProgressStageStatus = await StageStatus.findOne({ where: { stageStatusName: StageStatusEnum.INPROGRESS } });
+//       if (inProgressStageStatus) await stageAux.setStageStatus(inProgressStageStatus);
+//     }
+//     if (projectStatus.projectStatusName === ProjectStatusEnum.ACTIVE) {
+//       const inProgressProjectStatus = await ProjectStatus.findOne({ where: { projectStatusName: ProjectStatusEnum.INPROGRESS } });
+//       if (inProgressProjectStatus) await proy.setProjectStatus(inProgressProjectStatus);
+//     }
+//   }
+
+  
+// //Valido si las nuevas fechas ingresadas no extienden los limites del proyecto
+//   const parsedStart = parse(taskStartDate, 'dd-MM-yyyy', new Date());
+//   const parsedEnd = parse(taskEndDate, 'dd-MM-yyyy', new Date());
+//   await validateTaskDateWithinProjectLimits(updatedTask.taskStageId, parsedStart, parsedEnd);
+
+//   //Actualizo la tarea
+//   updatedTask.taskTitle = taskName;
+//   updatedTask.taskOrder = taskOrder;
+//   updatedTask.taskStartDate = parsedStart;
+//   updatedTask.taskEndDate = parsedEnd;
+//   if (priority != null) updatedTask.taskPriority = Number(priority);
+//   updatedTask.taskDescription = taskDescription || null;
+//   updatedTask.taskStatusId =  await validStatus.taskStatusId;
+//   updatedTask.updatedDate = new Date();
+
+//   await updatedTask.save();
+
+//   //actualizo el progreso
+//   await updateStageProgress(updatedTask.taskStageId);
+
+//   //actualizo las fechas de la etapa
+//   await updateStageDates(updatedTask.taskStageId);
+
+// // Si todas las tareas están finalizadas, cambiar a FINALIZADO
+// if(validStatus.taskStatusName == TaskStatusEnum.FINISHED){
+//   const tasksOfStage = await Task.findAll({ where: { taskStageId: stageAux.stageId }, include: [TaskStatus] });
+//   const allFinished = tasksOfStage.every(t => t.TaskStatus?.taskStatusName === TaskStatusEnum.FINISHED);
+//   if (allFinished) {
+//     const finishedStageStatus = await StageStatus.findOne({ where: { stageStatusName: StageStatusEnum.FINISHED } });
+//     if (finishedStageStatus) await stageAux.setStageStatus(finishedStageStatus);
+
+//     const allStages = await Stage.findAll({ where: { stageProjectId: proy.projectId }, include: [StageStatus] });
+//     const allStagesFinished = allStages.every(s => s.StageStatus?.stageStatusName === StageStatusEnum.FINISHED);
+//     if (allStagesFinished) {
+//       const finishedProjectStatus = await ProjectStatus.findOne({ where: { projectStatusName: ProjectStatusEnum.FINISHED } });
+//       if (finishedProjectStatus) await proy.setProjectStatus(finishedProjectStatus);
+//     }
+//   }
+// }
+
+//   // ✅ Verificar si la etapa y el proyecto deben actualizar su estado a FINALIZADO
+// //await checkAndUpdateStageAndProjectStatusFromTask(updatedTask.taskId);
+//   return updatedTask;
+// }
 
 
 
@@ -631,16 +956,15 @@ export async function lowTask(userLoguedId: string, taskId: string) {
       {
         model: TaskStatus,
         where: {
-          taskStatusName: {
-            [Op.or]: [TaskStatusEnum.INPROGRESS, TaskStatusEnum.PENDING]
+          taskStatusName: TaskStatusEnum.PENDING
           }
         }
-      }
+      
     ]
   });
 
   if (!deletedTask) {
-    throw new NotFoundResultsError();
+    throw new ForbiddenAccessError("No se puede eliminar una tarea en progreso o finalizada");
   }
 
   const taskStage = await deletedTask.getStage();
