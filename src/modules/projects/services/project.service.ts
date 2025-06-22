@@ -65,7 +65,7 @@ export async function listProjects(userLoguedId: string, filters: ProjectFilter)
     where: whereConditions,
     attributes: ['projectId', 'projectName', 'projectStartDate', 'projectEndDate', 'createdDate'],
     include: [],
-    order: [["createdDate", "DESC"]],
+    order: [["projectStartDate", "DESC"]],
     limit: parseInt(appConfig.ROWS_PER_PAGE),
     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
   };
@@ -928,7 +928,7 @@ export async function lowStage(userLoguedId: string, stageId: string) {
   });
 
   if (!deletedStage) {
-    throw new NotFoundResultsError();
+    throw new ForbiddenAccessError("No es posible eliminar etapas en progreso o finalizadas");
   }
 
   // Obtener el proyecto de la etapa
