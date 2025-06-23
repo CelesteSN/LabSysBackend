@@ -51,7 +51,7 @@ export async function createProject(req: Request, res: Response): Promise<void> 
   await validateProjectDates(startDate, endDate);
 
   // Validar que la fecha de inicio no sea anterior a hoy
-   await validateProjectStartDate(startDate);
+  // await validateProjectStartDate(startDate);
   
 
   const newProject = await saveNewProject(userLoguedId, projectName, projectTypeId, startDate, endDate);
