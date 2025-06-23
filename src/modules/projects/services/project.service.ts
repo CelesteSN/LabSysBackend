@@ -689,8 +689,12 @@ export async function listStages(
   });
 
   if (stageList.length === 0) {
-    return null;
-  }
+  return {
+    projectId: project.projectId,
+    projectStatus: project.ProjectStatus?.projectStatusName ?? "Sin estado",
+    stages: []
+  };
+}
 
   const result = mapStageToDto(stageList);
   return result;
@@ -1047,6 +1051,17 @@ export async function listTask(userLoguedId: string, projectId: string, filters:
     await validateProjectMembership(userLoguedId, projectId);
   }
 
+
+  const project = await Project.findOne({
+    where: {
+      projectId : projectId},
+      include:[
+        {model : ProjectStatus,
+          attributes:["projectStatusName"]
+        }
+      ]
+    });
+    if(!project){throw new NotFoundProjectError}
     const whereConditions: any = {};
 
   // Filtro por búsqueda
@@ -1130,15 +1145,13 @@ if (filters?.priority != null) {
   });
 
   // Verificaciones
-  if (!taskList) throw new NotFoundResultsError();
-
-  if (taskList.length === 0) return null;
-
-  const allStagesAreNull = taskList.every(t => t.Stage === null);
-  if (allStagesAreNull) {
-    //throw new ProjectWithoutStagesError ();
-    return null
-  }
+  if (taskList.length === 0) {
+  return {
+    projectId: project.projectId,
+    projectStatus: project.ProjectStatus?.projectStatusName,
+    tasks: []
+  };
+}
   const result = mapTasksToProjectDetailsDto(taskList);
   return result;
 }
