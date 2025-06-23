@@ -4,14 +4,14 @@ export const stageSchema = Joi.object({
   stageName: Joi.string()
     .min(3)
     .max(90)
-    .pattern(/^[a-zA-Z0-9 _-]+$/, 'letras, números, espacios, guiones')
+    //.pattern(/^[a-zA-Z0-9 _-]+$/, 'letras, números, espacios, guiones')
     .required()
     .messages({
       'string.base': 'El nombre debe ser un texto.',
       'string.empty': 'El campo nombre no puede estar vacío.',
       'string.min': 'El nombre debe tener al menos 3 caracteres.',
       'string.max': 'El nombre no debe superar los 90 caracteres.',
-      'string.pattern.name': 'El nombre solo puede contener letras, números, espacios, guiones medios y guiones bajos.',
+      //'string.pattern.name': 'El nombre solo puede contener letras, números, espacios, guiones medios y guiones bajos.',
       'any.required': 'El campo nombre es obligatorio.'
     }),
 });

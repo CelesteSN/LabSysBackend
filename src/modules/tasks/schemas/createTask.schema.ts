@@ -25,9 +25,9 @@ export const createTaskSchema = Joi.object({
     .min(3)
     .max(90)
     .required()
-    .pattern(/^[a-zA-Z0-9 _-]+$/, 'letras, números, espacios, guiones')
+    //.pattern(/^[a-zA-Z0-9 _-]+$/, 'letras, números, espacios, guiones')
     .messages({
-      'string.pattern.name': 'La tarea solo puede contener letras, números, espacios, guiones medios y guiones bajos.',
+      //'string.pattern.name': 'La tarea solo puede contener letras, números, espacios, guiones medios y guiones bajos.',
       'string.empty': 'El campo nombre no puede estar vacío.',
       'any.required': 'El campo orden es obligatorio.',
       'string.min': 'El nombre debe tener al menos 3 caracteres.',
