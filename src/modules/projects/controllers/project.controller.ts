@@ -175,15 +175,6 @@ export const getAllStages = catchAsync(async (req: Request, res: Response) => {
 
   const stageList = await listStages(userLoguedId, projectId, filters);
 
-  if (stageList == null) {
-    return res.status(200).json({
-      success: true,
-      //pageNumber,
-      //message: 'No se encontraron resultados.',
-      data: []
-    });
-  }
-
   return res.status(200).json({
     success: true,
     pageNumber,
@@ -304,14 +295,6 @@ export async function getAllTask(req: Request, res: Response) {
   
 
   const tasks = await listTask(userLoguedId, projectId, filters);
-
-  if (tasks == null) {
-    return res.status(200).json({
-      success: true,
-      //message: 'No se encontraron resultados.',
-      data: []
-    });
-  }
 
   return res.status(200).json({
     success: true,
