@@ -58,11 +58,12 @@ export const createTaskSchema = Joi.object({
 
 
   taskPriority: Joi.number()
-    .valid(0, 1, 2, 3)
-    .messages({
-      'any.only': 'La prioridad debe ser 0 (baja), 1 (media), 2 (alta) o 3 (urgente).',
-      'any.required': 'La prioridad es obligatoria.'
-    }),
+  .valid(0, 1, 2, 3)
+  .optional()
+  .messages({
+    'any.only': 'La prioridad debe ser 0 (baja), 1 (media), 2 (alta) o 3 (urgente).'
+  }),
+
 
     taskStartDate: Joi.string()
       .pattern(/^\d{2}-\d{2}-\d{4}$/)

@@ -135,10 +135,12 @@ export async function addTask(
   newTask.taskDescription = taskDescription || null;
   newTask.taskOrder = newTaskOrder;
 
-  if (priority != null) {
+  if (priority == null) {
+    newTask.taskPriority = 0;
+  }else{
     newTask.taskPriority = Number(priority);
-  }
 
+  }
   newTask.createdDate = new Date();
   newTask.updatedDate = new Date();
   newTask.taskStartDate = parse(taskStartDate, 'dd-MM-yyyy', new Date());
@@ -505,6 +507,7 @@ export async function modifyTask(
     throw new ForbiddenAccessError();
   }
 
+  
   const updatedTask = await Task.findOne({
     where: { taskId, taskUserId: userLoguedId },
     include: [
@@ -556,6 +559,7 @@ export async function modifyTask(
   const validStatus = await TaskStatus.findOne({ where: { taskStatusId: taskStatus } });
   if (!validStatus) throw new StatusNotFoundError();
 
+  if(validStatus.taskStatusName == TaskStatusEnum.DELAYED){throw new ForbiddenAccessError("No puede pasar la tarea al estado atrasada manualmetne")};
   if (
     updatedTask.TaskStatus.taskStatusName == TaskStatusEnum.DELAYED &&
     validStatus.taskStatusName != TaskStatusEnum.FINISHED
