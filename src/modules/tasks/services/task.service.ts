@@ -559,7 +559,7 @@ export async function modifyTask(
   const validStatus = await TaskStatus.findOne({ where: { taskStatusId: taskStatus } });
   if (!validStatus) throw new StatusNotFoundError();
 
-  if(validStatus.taskStatusName == TaskStatusEnum.DELAYED){throw new ForbiddenAccessError("No puede pasar la tarea al estado atrasada manualmetne")};
+  if(validStatus.taskStatusName == TaskStatusEnum.DELAYED || validStatus.taskStatusName == TaskStatusEnum.LOW|| validStatus.taskStatusName == TaskStatusEnum.PENDING){throw new ForbiddenAccessError("No puede pasar la tarea a este estado atrasada manualmetne")};
   if (
     updatedTask.TaskStatus.taskStatusName == TaskStatusEnum.DELAYED &&
     validStatus.taskStatusName != TaskStatusEnum.FINISHED
