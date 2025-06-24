@@ -344,29 +344,19 @@ export async function addAnswer(userLoguedId: string, userId: string, response: 
 
 export async function modifyUser(userLoguedId: string, id: string, firstName: string, lastName: string, email: string, personalFile: string, dni: string, phone_number?: string): Promise<User | null> {
 
-    // const user = await User.findByPk(id);
-    // if (!user) {
-    //     return null; // Usuario no encontrado
-    // }
-    // const userStatus = await user.getUserStatus();
     const userValidated = await validateActiveUser(userLoguedId);
 
     if (!(userLoguedId == id)) { throw new ForbiddenAccessError(); }
 
 
-    userValidated.userFirstName = firstName;
-    userValidated.userLastName = lastName;
-    userValidated.userEmail = email;
+    userValidated.userFirstName = formatName(firstName);
+    userValidated.userLastName = formatName(lastName);
+    userValidated.userEmail = formatEmail(email);
     if (phone_number) {
         userValidated.userPhoneNumber = phone_number;
     }
     userValidated.userDni = dni;
     userValidated.userPersonalFile = personalFile;
-
-    //   if (password !== undefined && password.trim() !== '') {
-    //     user.userPassword = await bcrypt.hash(password, 10);
-    //   }
-
     userValidated.updatedDate = new Date();
 
     await userValidated.save(); // Guardar los cambios en la base de datos
