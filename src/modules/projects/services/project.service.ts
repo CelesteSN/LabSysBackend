@@ -1084,7 +1084,11 @@ if (filters?.priority != null) {
 
   if (stages.length === 0) {
     //throw new NotFoundStagesError();
-    return null;
+    return {
+    projectId: project.projectId,
+    projectStatus: project.ProjectStatus?.projectStatusName,
+    tasks: []
+  };
   }
 
   const taskList = await Task.findAll({
