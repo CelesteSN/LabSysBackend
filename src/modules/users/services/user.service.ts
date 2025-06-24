@@ -45,165 +45,6 @@ import { NotificationEmail } from "../../notifications/models/notificationEmail.
  * @returns Lista de usuarios como DTOs.
  */
 
-// export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
-
-//     // //Bloque para validar usuario existente y activo
-    
-//     const userValidated = await validateActiveUser(userLoguedId);
-//     //Obtengo el rol del usuario logueado para verificar si  es tutor
-//     const roleUser = await userValidated.getRole();
-//     if (roleUser?.roleName == RoleEnum.TUTOR) {
-
-//         // Construimos condiciones dinámicas
-//         const whereConditions: any = {};
-
-
-//         const statusRaw = filters?.status?.trim(); // elimina espacios
-//         const status = statusRaw ?? UserStatusEnum.PENDING; // si no viene, usar "Pendiente"
-//         const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
-
-
-//         const normalizedRole = filters?.role?.trim();
-//         const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== 'todos';
-
-
-
-//         if (filters?.search) {
-//             whereConditions[Op.or] = [
-//                 { userFirstName: { [Op.iLike]: `%${filters.search}%` } },
-//                 { userLastName: { [Op.iLike]: `%${filters.search}%` } }
-//             ];
-//         }
-
-//         if (filters?.fromDate) {
-//             whereConditions.createdDate = { ...whereConditions.createdDate, [Op.gte]: filters.fromDate };
-//         }
-
-//         if (filters?.toDate) {
-//             whereConditions.createdDate = { ...whereConditions.createdDate, [Op.lte]: filters.toDate };
-//         }
-//         //Obtener listado de usuarios con filtros
-//         const users = await User.findAll({
-//             where: whereConditions,
-//             attributes: [
-//                 'userId',
-//                 'userFirstName',
-//                 'userLastName',
-//                 'createdDate'
-//             ],
-//             include: [
-//                 {
-//                     model: UserStatus,
-//                     attributes: ['userStatusName'],
-//                     ...(isStatusAll ? {} : { where: { userStatusName: status } })
-//                 },
-//                 {
-//                     model: Role,
-//                     attributes: ['roleName'],
-//                     ...(isSpecificRole
-//                         ? { where: { roleName: normalizedRole } }
-//                         : { where: { roleName: { [Op.not]: 'Tutor' } } } // no se especificó → excluye "Tutor"
-//                         //: {} // no aplica filtro → trae todos
-//                     )
-//                 }
-//             ],
-//             order: [["createdDate", "ASC"]],
-//             limit: parseInt(appConfig.ROWS_PER_PAGE),
-//             offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-//         });
-
-//         return users.map(mapUserToDto);
-//     }
-//     else {
-
-//         throw new ForbiddenAccessError();
-
-
-//     }
-
-// }
-
-
-
-
-
-
-
-
-
-
-// export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
-//   // Validar usuario activo
-//   const userValidated = await validateActiveUser(userLoguedId);
-//   const roleUser = await userValidated.getRole();
-
-//   if (roleUser?.roleName !== RoleEnum.TUTOR) {
-//     throw new ForbiddenAccessError();
-//   }
-
-//   // Construcción dinámica del where
-//   const whereConditions: any = {};
-
-//   // Search siempre independiente
-//   if (filters?.search?.trim()) {
-//     const search = filters.search.trim();
-//     whereConditions[Op.or] = [
-//       { userFirstName: { [Op.iLike]: `%${search}%` } },
-//       { userLastName: { [Op.iLike]: `%${search}%` } }
-//     ];
-//   }
-
-//   // Rango de fechas opcional
-//   if (filters?.fromDate) {
-//     whereConditions.createdDate = {
-//       ...whereConditions.createdDate,
-//       [Op.gte]: filters.fromDate,
-//     };
-//   }
-
-//   if (filters?.toDate) {
-//     whereConditions.createdDate = {
-//       ...whereConditions.createdDate,
-//       [Op.lte]: filters.toDate,
-//     };
-//   }
-
-//   // Procesar filtros de status y rol
-//   const statusRaw = filters?.status?.trim();
-//   const status = statusRaw ?? UserStatusEnum.PENDING;
-//   const isStatusAll = status.toLowerCase() === UserStatusEnum.ALL.toLowerCase();
-
-//   const normalizedRole = filters?.role?.trim();
-//   const isSpecificRole = !!normalizedRole && normalizedRole.toLowerCase() !== "todos";
-
-//   const includeOptions = [
-//     {
-//       model: UserStatus,
-//       attributes: ["userStatusName"],
-//       ...(isStatusAll ? {} : { where: { userStatusName: status } })
-//     },
-//     {
-//       model: Role,
-//       attributes: ["roleName"],
-//       ...(isSpecificRole
-//         ? { where: { roleName: normalizedRole } }
-//         : { where: { roleName: { [Op.not]: RoleEnum.TUTOR } } })
-//     }
-//   ];
-
-//   const users = await User.findAll({
-//     where: whereConditions,
-//     attributes: ["userId", "userFirstName", "userLastName", "createdDate"],
-//     include: includeOptions,
-//     order: [["createdDate", "Desc"]],
-//     limit: parseInt(appConfig.ROWS_PER_PAGE),
-//     offset: parseInt(appConfig.ROWS_PER_PAGE) * filters.pageNumber,
-//   });
-
-//   return users.map(mapUserToDto);
-// }
-
-
 
 
 export async function listUsers(userLoguedId: string, filters: UserFilter): Promise<AllUsersDto[]> {
@@ -304,10 +145,10 @@ export async function addUser(firstName: string, lastName: string, dni: string, 
     //creo el usuario
     const newUser = await User.build({
         //newUser.userId = randomUUID(),
-        userFirstName: firstName,
-        userLastName: lastName,
+        userFirstName: formatName(firstName),
+        userLastName: formatName(lastName),
         userDni: dni,
-        userEmail: email,
+        userEmail: formatEmail(email),
         userPassword: hashedPassword,
         userPersonalFile: personalFile,
         createdDate: new Date(),
@@ -612,4 +453,15 @@ export async function validateActiveUser(userId: string): Promise<User> {
     }
 
     return user;
+}
+
+
+
+
+function formatName(name: string) {
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
+function formatEmail(email: string) {
+  return email.toLowerCase();
 }
